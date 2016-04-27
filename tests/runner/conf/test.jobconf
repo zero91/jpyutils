@@ -1,0 +1,65 @@
+TaskRunner(
+    name = "clean_output_dir",
+    command = "ls",
+)
+
+TaskRunner(
+    name = "copy_and_mark_query",
+    command = "ls;sleep 3",
+    depends = "clean_output_dir",
+    shell   = True,
+)
+
+TaskRunner(
+    name = "copy_and_mark_impress",
+    command = "ls;sleep 2",
+    depends = "clean_output_dir",
+    shell   = True,
+)
+
+TaskRunner(
+    name = "copy_and_mark_save",
+    command = "ls;sleep 4",
+    depends = "clean_output_dir",
+    shell   = True,
+)
+
+TaskRunner(
+    name = "copy_and_mark_query2provid",
+    command = "ls;sleep 5",
+    depends = "clean_output_dir",
+    shell   = True,
+)
+
+TaskRunner(
+    name = "copy_and_mark_impress2strategy",
+    command = "ls;sleep 3",
+    depends = "clean_output_dir",
+    shell   = True,
+)
+
+TaskRunner(
+    name = "remove_join_output_dir",
+    command = "ls",
+    depends = "copy_and_mark_query, copy_and_mark_impress, copy_and_mark_save, " + \
+              "copy_and_mark_query2provid, copy_and_mark_impress2strategy",
+)
+
+TaskRunner(
+    name = "do_join",
+    command = "ls",
+    depends = "remove_join_output_dir",
+)
+
+TaskRunner(
+    name = "clean_tmp_dirs",
+    command = "ls",
+    depends = "do_join"
+)
+
+TaskRunner(
+    name = "clean_tmp_dirs2",
+    command = "ls",
+    depends = "clean_tmp_dirs"
+)
+
