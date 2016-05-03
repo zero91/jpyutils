@@ -229,7 +229,7 @@ class Hadoop:
         pre_sigterm_handler = signal.signal(signal.SIGTERM, self.__kill_handler)
 
         if clear_output:
-            output_path = streaming_cmd.split(" -output ")[-1].strip().split(' ')[0]
+            output_path = cmd.split(" -output ")[-1].strip().split(' ')[0]
             self.remove_path(output_path)
 
         task = runner.task_runner.TaskRunner(cmd)
