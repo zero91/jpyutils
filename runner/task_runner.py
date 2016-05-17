@@ -319,6 +319,8 @@ class MultiTaskRunner:
             depends_task_set = set()
         else:
             depends_task_set = set(map(lambda item: item.strip(), depends.split(',')))
+
+        depends_task_set.discard('')
         self.__task_depends_list.append((runner.name, depends_task_set))
         return True
 
@@ -358,6 +360,7 @@ class MultiTaskRunner:
         """List all jobs in topological_order with job id.
         """
         if not self.__valid_topological(update):
+            sys.stderr.write("Invalid tasks group, please check it!\n")
             return False
         _MultiTaskProgressDisplay(self.__task_id,
                                  dict(self.__task_depends_list),
@@ -519,7 +522,7 @@ class _MultiTaskProgressDisplay():
         self.__task_id_len = len(str(max(self.__task_id.values()))) + 3
         self.__task_name_left = self.__task_id_len + 1
 
-        self.__pos = dict([ ('id', len(str(max(self.__task_id.values()))) + 3),
+        self.__pos = dict([ ('id', len(str(max(self.__task_id.values()))) + 4),
                             ('task_name', max(map(lambda t: len(t), self.__task_id.keys()))),
                             ('status', 8),
                             ('start_time', 19), # format: YYYY-mm-dd HH:MM:SS
