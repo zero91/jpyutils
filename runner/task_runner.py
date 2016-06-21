@@ -375,17 +375,22 @@ class MultiTaskRunner:
             The tasks which needed to be executed, sepecified by topological ids,
             format like "1-3,5,8,9-10".
 
+        Returns
+        -------
+        result : integer
+            0 for success, otherwise -1
+
         Notes
         -----
             Should only be executed once.
         """
         if self.__started:
             sys.stderr.write("Task should be executed only once")
-            return False
+            return -1
 
         if not self.__valid_topological():
             sys.stderr.write("Task dependency graph is not topological!\n")
-            return False
+            return -1
         self.__started = True
 
         signal.signal(signal.SIGINT, self.__kill_handler)
@@ -437,7 +442,7 @@ class MultiTaskRunner:
                     sys.stderr.write("Task [%s] failed, return code [%d]\n" % (
                                             self.__task_runner[name].name,
                                             self.__task_runner[name].returncode))
-                    return False
+                    return -1
 
                 if name in reverse_depends_dict:
                     for depends in reverse_depends_dict[name]:
@@ -449,7 +454,7 @@ class MultiTaskRunner:
             time.sleep(0.1)
 
         progress.display()
-        return True
+        return 0
 
     def __valid_topological(self, update=False):
         if update is not True and self.__task_id is not None:
