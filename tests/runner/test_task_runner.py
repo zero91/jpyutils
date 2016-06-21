@@ -1,11 +1,13 @@
 import sys
+import subprocess
 sys.path.append("../../../")
 
 from jpyutils.runner import task_runner
 
 verbose = True
-log = None
+#log = None
 #log = "log/"
+log = subprocess.PIPE
 
 def test_add_job():
     task = task_runner.MultiTaskRunner(log)
