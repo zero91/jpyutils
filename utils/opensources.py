@@ -41,7 +41,8 @@ class OpenSources(object):
                    depends = "remove_path",
                    name = "create_path")
 
-        runner.add(command = "cd %s && curl -# -O %s" % (self.__target_root, url),
+        #runner.add(command = "cd %s && curl -# -O %s" % (self.__target_root, url),
+        runner.add(command = "wget -c -P %s %s" % (self.__target_root, url),
                    depends = "create_path",
                    name = "download")
 

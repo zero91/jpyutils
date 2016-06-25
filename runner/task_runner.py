@@ -453,7 +453,7 @@ class MultiTaskRunner:
                 break
             time.sleep(0.1)
 
-        progress.display()
+        verbose and progress.display()
         return 0
 
     def __valid_topological(self, update=False):
