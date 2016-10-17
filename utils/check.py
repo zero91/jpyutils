@@ -1,8 +1,7 @@
+# coding: utf-8
+# Author: Donald Cheung <jianzhang9102@gmail.com>
 """Utility for doing small things quickly.
 """
-
-# Author: Donald Cheung <jianzhang9102@gmail.com>
-
 import re
 
 def is_float(s):
@@ -25,5 +24,7 @@ def is_float(s):
 
     >>> is_float('1.498e-1.2')
     True
+
     """
     return re.match(re.compile("^[-+]?[0-9]+(?:\.[0-9]+)?(?:[eE][-+]?[0-9]+)?$"), s) is not None
+
