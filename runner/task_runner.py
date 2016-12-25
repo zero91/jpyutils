@@ -88,12 +88,12 @@ class TaskRunner(threading.Thread):
     TaskRunner.returncode
         Attribute which specify the exit code of this task.
     """
-    def __init__(self, command, name = None,
-                                log = subprocess.PIPE,
-                                shell = True,
-                                check_before = None,
-                                check_after = None,
-                                retry = 1):
+    def __init__(self, command, name=None,
+                                log=subprocess.PIPE,
+                                shell=True,
+                                check_before=None,
+                                check_after=None,
+                                retry=1):
         threading.Thread.__init__(self, name=name)
         self.__shell = shell
         self.__retry = retry
