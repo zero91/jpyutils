@@ -1,8 +1,13 @@
+"""Manage a batch of tasks' topological relations."""
+
 # Author: Donald Cheung <jianzhang9102@gmail.com>
+
 import collections
 import copy
 
 class TaskDependencyManager(object):
+    """Manage a batch of tasks' topological relations.
+    """
     def __init__(self):
         self.__dependency_info = collections.defaultdict(set)
         self.__task_id = collections.defaultdict(list) # task_name => (initial ID, running ID)
@@ -10,12 +15,40 @@ class TaskDependencyManager(object):
 
     @classmethod
     def from_data(cls, task_depends_list):
+        """Class method.  Create a `TaskDependencyManager' object from `task_depends_list'.
+
+        Parameters
+        ----------
+        task_depends_list: list
+            A sequence of tasks, each item is format (task_name, depends).
+
+        Returns
+        -------
+        instance: TaskDependencyManager
+            Instance constructed from input argument.
+        """
         instance = cls()
         for task_name, depends in task_depends_list:
             instance.add_dependency(task_name, depends)
         return instance
 
     def add_dependency(self, task_name, depend_tasks=None):
+        """Add one dependency relation.
+
+        Parameters
+        ----------
+        task_name: string
+            Task's name.
+
+        depend_tasks: string/list/set/dict/collections.defaultdict
+            Tasks which need to be done before `task_name'.
+
+        Returns
+        -------
+        instance: TaskDependencyManager
+            Current instance's reference.
+        """
+        
         self.__task_id[task_name] = [len(self.__task_id), None]
 
         if depend_tasks is None or len(depend_tasks) == 0:
@@ -23,7 +56,7 @@ class TaskDependencyManager(object):
         elif isinstance(depend_tasks, (list, set, dict, collections.defaultdict)):
             depend_tasks_set = set(depend_tasks)
         elif isinstance(depend_tasks, str):
-            depend_tasks_set = set(depend_tasks.split(','))
+            depend_tasks_set = set(map(str.strip, depend_tasks.split(',')))
         else:
             self.__task_id.pop(task_name)
             raise TypeError("depend_tasks's data type does not support")
@@ -33,9 +66,33 @@ class TaskDependencyManager(object):
         return self
 
     def get_dependency(self, task_name):
+        """Get dependency tasks of `task_name'.
+
+        Parameters
+        ----------
+        task_name: string
+            Task's name
+
+        Returns
+        -------
+        depend_set: set
+            Set of jobs which need to be done before `task_name'.
+        """
         return self.__dependency_info.get(task_name, set())
 
     def get_tasks_info(self):
+        """Get all tasks' informations.
+
+        Returns
+        -------
+        is_valid: boolean
+            Whether all tasks' relations is topological.
+
+        tasks_info: collections.defaultdict
+            All tasks' information. key is the task's name, value contains
+                (initial_id, running_id, depend_set, reverse_depend_set)
+        """
+
         self.is_topological()
         tasks = collections.defaultdict(list)
         for task_name, (initial_id, running_id) in self.__task_id.iteritems():
@@ -48,6 +105,14 @@ class TaskDependencyManager(object):
         return self.__is_valid, tasks
 
     def is_topological(self):
+        """Test whether current relations is topological.
+
+        Returns
+        -------
+        is_topological: boolean
+            True is current relations is topological, otherwise False.
+        """
+
         if self.__is_valid is not None:
             return self.__is_valid
 
@@ -89,6 +154,32 @@ class TaskDependencyManager(object):
         return None
 
     def parse_tasks(self, tasks_list_str):
+        """Parse a string into full tasks with its dependency relations.
+
+        Parameters
+        ----------
+        tasks_list_str: string
+            Suppose we have a batch of tasks as [(0, 'a'), (1, 'b'), (2, 'c'), ..., (25, 'z')].
+
+            `tasks_list_str' support following formats:
+            (1) "-3,5,7-10-2,13-16,19-".
+                "-3" means range from 0(start) to 3, which is "0,1,2,3".
+                "7-10-2" means range from 7 to 10, step length 2, which is "7,9".
+                "13-16" means range from 13 to 16, step length 1, which is "13,14,15,16."
+                "19-" mean range from 19 to 25(end), which is "19,20,21,22,23,24,25".
+
+            (2) "1-4,x,y,z"
+                "1-4" mean range from 1 to 4, which is "1,2,3,4"
+                "x" mean task 'x', task id is 23.
+                "y" mean task 'y', task id is 24.
+                "z" mean task 'z', task id is 25.
+                So, above string mean jobs "1,2,3,4,23,24,25".
+
+        Returns
+        -------
+        dependency_manager: TaskDependencyManager
+            TaskDependencyManager which contains all the jobs specified by input argument.
+        """
         self.is_topological()
         if tasks_list_str is None:
             return copy.deepcopy(self)
