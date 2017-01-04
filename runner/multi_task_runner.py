@@ -10,6 +10,7 @@ import time
 import signal
 import re
 import os
+import collections
 
 from .task_runner import TaskRunner
 from .dependency_manager import TaskDependencyManager
@@ -38,9 +39,15 @@ class MultiTaskRunner(object):
     retry: integer
         Try executing each task retry times until succeed.
     """
-    def __init__(self, log=None, render_arguments={}, parallel_degree=sys.maxint, retry=1):
+    def __init__(self, log=None, render_arguments=None, parallel_degree=sys.maxint, retry=1):
         self.__log = log
-        self.__render_arguments = render_arguments
+        if render_arguments is None:
+            self.__render_arguments = dict()
+        elif isinstance(render_arguments, (dict, collections.defaultdict)):
+            self.__render_arguments = render_arguments
+        else:
+            raise ValueError("type of parameter `render_arguments' does not supported")
+
         self.__parallel_degree = parallel_degree
         self.__retry = retry
 

@@ -144,8 +144,8 @@ class TaskRunner(threading.Thread):
 
         elapse_time = self.__elapse_time.total_seconds()
         elapse_time += self.__elapse_time.microseconds / 1000000
-        return { 'elapse_time' : elapse_time,
-                 'start_time' : self.__start_time,
-                 'returncode' : self.returncode,
-                 'try_info' : "%s/%s" % (self.__try_num, self.__retry_limit) }
+        return { 'elapse_time': elapse_time,
+                 'start_time': self.__start_time,
+                 'returncode': self.returncode,
+                 'try_info': "%s/%s" % (self.__try_num, self.__retry_limit) }
 

@@ -1,3 +1,5 @@
+"""Tools for display tasks' status friendly."""
+
 # Author: Donald Cheung <jianzhang9102@gmail.com>
 
 from jpyutils.utils import shell
@@ -20,6 +22,16 @@ _TaskStatusColor = {
 }
 
 class TableProgressDisplay(object):
+    """Display tasks' status in a table.
+
+    Parameters
+    ----------
+    dependency_manager: TaskDependencyManager
+        Tasks' dependency relations manager.
+
+    task_runner_dict: dict
+        Task runner dict, key is task's name, value is as (status, runner).
+    """
     def __init__(self, dependency_manager, task_runner_dict):
         self.__tasks_info = dependency_manager.get_tasks_info()[1]
         self.__tasks_list = sorted(self.__tasks_info, key=lambda name: self.__tasks_info[name][1])
@@ -34,16 +46,18 @@ class TableProgressDisplay(object):
 
         max_id_length = len(str(max(map(operator.itemgetter(1), self.__tasks_info.values()))))
         self.__task_info_length = {
-                                    'id' : max_id_length,
-                                    'task_name' : max(map(len, self.__tasks_info)),
-                                    'status' : 8,
-                                    'start_time' : 19, # format: YYYY-mm-dd HH:MM:SS
-                                    'elapse_time' : 9,
-                                    'try_info' : 5
+                                    'id': max_id_length,
+                                    'task_name': max(map(len, self.__tasks_info)),
+                                    'status': 8,
+                                    'start_time': 19, # format: YYYY-mm-dd HH:MM:SS
+                                    'elapse_time': 9,
+                                    'try_info': 5
                                     }
         self.__display_times = 0
 
     def display(self):
+        """Display all tasks' status as a table.
+        """
         self.__display_times += 1
         fout = sys.stderr
         if self.__display_times % 100 == 1:

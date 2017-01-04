@@ -48,7 +48,6 @@ class TaskDependencyManager(object):
         instance: TaskDependencyManager
             Current instance's reference.
         """
-        
         self.__task_id[task_name] = [len(self.__task_id), None]
 
         if depend_tasks is None or len(depend_tasks) == 0:
@@ -221,4 +220,4 @@ class TaskDependencyManager(object):
         for task in valid_tasks_list:
             valid_tasks_depends.append(valid_tasks_set & self.__dependency_info[task])
         return self.__class__.from_data(zip(valid_tasks_list, valid_tasks_depends))
-    
+
