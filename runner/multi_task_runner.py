@@ -231,7 +231,8 @@ class MultiTaskRunner(object):
                 if ret_code != 0:
                     self.__task_runner_dict[task_name][0] = TaskStatus.FAILED
                     self.terminate()
-                    sys.stderr.write("Task {0} failed, exit code {1}\n" % (task_name, ret_code))
+                    displayer.display()
+                    sys.stderr.write("Task {0} failed, exit code {1}\n".format(task_name, ret_code))
                     return 1
                 else:
                     self.__task_runner_dict[task_name][0] = TaskStatus.DONE
