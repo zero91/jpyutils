@@ -87,7 +87,6 @@ class TableProgressDisplay(object):
         task_show_str_list.append("[%s]." % (str(self.__tasks_info[task_name][1]).zfill(\
                                                 self.__task_info_length['id'])))
         task_show_str_list.append(task_name.ljust(self.__task_info_length['task_name']))
-        task_show_str_list.append('|')
 
         if task_status == TaskStatus.DISABLED:
             highlight = False
@@ -100,11 +99,11 @@ class TableProgressDisplay(object):
         status_desc, status_color = _TaskStatusColor[task_status]
         status_desc_str = shell.tint(status_desc.ljust(self.__task_info_length['status']),
                                             font_color=status_color, highlight=highlight)
-        task_show_str_list.append(status_desc_str)
         task_show_str_list.append('|')
+        task_show_str_list.append(status_desc_str)
 
-        task_info['start_time'] = datetime.datetime.now()
         if task_info['start_time'] is not None:
+            task_show_str_list.append('|')
             task_show_str_list.append(task_info['start_time'].strftime("%Y.%m.%d %H:%M:%S"))
 
             task_show_str_list.append('|')
