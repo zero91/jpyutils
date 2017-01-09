@@ -261,3 +261,22 @@ class MultiTaskRunner(object):
             self.__task_runner_dict[task_name][1].terminate()
             self.__task_runner_dict[task_name][0] = TaskStatus.KILLED
             self.__running_task_set.remove(task_name)
+
+    def get_task_runner(self, task_name):
+        """Get task runner reference of `task_name'
+
+        Parameters
+        ----------
+        task_name: string
+            Target task's name.
+
+        Returns
+        -------
+        runner: TaskRunner
+            Reference runner of `task_name'.
+
+        """
+        if  task_name not in self.__task_runner_dict:
+            return None
+        return self.__task_runner_dict[task_name][1]
+

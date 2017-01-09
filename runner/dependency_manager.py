@@ -205,7 +205,7 @@ class TaskDependencyManager(object):
                 if start is None:
                     start = 0
                 if stop is None:
-                    stop = len(task_id) - 1
+                    stop = len(self.__task_id) - 1
                 if step is None:
                     step = 1
                 tasks_set |= set(range(start, stop + 1, step))
