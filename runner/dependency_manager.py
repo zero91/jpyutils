@@ -52,7 +52,7 @@ class TaskDependencyManager(object):
 
         if depend_tasks is None or len(depend_tasks) == 0:
             depend_tasks_set = set()
-        elif isinstance(depend_tasks, (list, set, dict, collections.defaultdict)):
+        elif isinstance(depend_tasks, (list, tuple, set, dict)):
             depend_tasks_set = set(depend_tasks)
         elif isinstance(depend_tasks, str):
             depend_tasks_set = set(map(str.strip, depend_tasks.split(',')))

@@ -56,7 +56,7 @@ class MultiTaskRunner(object):
         self.__running_task_set = set()
         self.__started = False
 
-    def add(self, command, name=None, depends=None, **popen_kwargs):
+    def add(self, command, name=None, depends=None, append_log=True, **popen_kwargs):
         """Add a new task.
 
         Parameters
@@ -72,6 +72,9 @@ class MultiTaskRunner(object):
         depends: string
             A string which is the concatenation of the names of all the tasks which must be
             executed ahead of this task. Separated by a single comma(',').
+
+        append_log: boolean
+            Append to log file if set True, otherwise clear old content.
 
         popen_kwargs: dict
             It has the same meaning as Popen's arguments.
@@ -89,10 +92,16 @@ class MultiTaskRunner(object):
                 os.makedirs(self.__log)
 
             if "stdout" not in popen_kwargs:
-                popen_kwargs['stdout'] = open("%s/%s.stdout" % (self.__log, name), 'a+')
+                if append_log is True:
+                    popen_kwargs['stdout'] = open("%s/%s.stdout" % (self.__log, name), 'a+')
+                else:
+                    popen_kwargs['stdout'] = open("%s/%s.stdout" % (self.__log, name), 'w+')
 
             if "stderr" not in popen_kwargs:
-                popen_kwargs['stderr'] = open("%s/%s.stderr" % (self.__log, name), 'a+')
+                if append_log is True:
+                    popen_kwargs['stderr'] = open("%s/%s.stderr" % (self.__log, name), 'a+')
+                else:
+                    popen_kwargs['stderr'] = open("%s/%s.stderr" % (self.__log, name), 'w+')
         else:
             popen_kwargs['stdout'] = self.__log
             popen_kwargs['stderr'] = self.__log
