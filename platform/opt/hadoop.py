@@ -694,6 +694,9 @@ class Hadoop(object):
 
     def __join_values(self, values):
         value_list = list()
+        if values is None:
+            return value_list
+
         if isinstance(values, int):
             value_list = [(values, None)]
         elif isinstance(values, str):

@@ -27,16 +27,18 @@ class Mapper(object):
         self.__left_pattern = re.compile(args.left_pattern)
         self.__left_key_list = map(int, args.left_key.split(','))
         self.__left_value_list = list()
-        for value in args.left_value.split(','):
-            idx, default = value.split(':')
-            self.__left_value_list.append((int(idx), default))
+        if args.left_value is not None:
+            for value in args.left_value.split(','):
+                idx, default = value.split(':')
+                self.__left_value_list.append((int(idx), default))
 
         self.__right_pattern = re.compile(args.right_pattern)
         self.__right_key_list   = map(int, args.right_key.split(','))
         self.__right_value_list = list()
-        for value in args.right_value.split(','):
-            idx, default = value.split(':')
-            self.__right_value_list.append((int(idx), default))
+        if args.right_value is not None:
+            for value in args.right_value.split(','):
+                idx, default = value.split(':')
+                self.__right_value_list.append((int(idx), default))
 
     def run(self):
         if self.__method == "left" or self.__method == "inner":
@@ -80,14 +82,16 @@ class Reducer(object):
     def __init__(self, method, left_value, right_value):
         self.__method = method 
         self.__left_value_list = list()
-        for value in left_value.split(','):
-            idx, default = value.split(':')
-            self.__left_value_list.append((int(idx), default))
+        if left_value is not None:
+            for value in left_value.split(','):
+                idx, default = value.split(':')
+                self.__left_value_list.append((int(idx), default))
 
         self.__right_value_list = list()
-        for value in right_value.split(','):
-            idx, default = value.split(':')
-            self.__right_value_list.append((int(idx), default))
+        if right_value is not None:
+            for value in right_value.split(','):
+                idx, default = value.split(':')
+                self.__right_value_list.append((int(idx), default))
 
     def run(self):
         if self.__method == "left":
@@ -102,6 +106,14 @@ class Reducer(object):
         else:
             sys.stderr.write("Unsupported joining method [{0}]\n".format(self.__method))
             exit(1)
+
+    def __output(self, left_value, right_value):
+        output_list = list()
+        if len(self.__left_value_list) > 0:
+            output_list.append(left_value)
+        if len(self.__right_value_list) > 0:
+            output_list.append(right_value)
+        sys.stdout.write("{0}\n".format("\t".join(output_list)))
 
     def __left(self):
         right_key = None
@@ -120,9 +132,9 @@ class Reducer(object):
                 left_value = '\t'.join(fields[2:])
                 if fields[0] == right_key:
                     for right_value in right_value_list:
-                        sys.stdout.write("{0}\t{1}\n".format(left_value, right_value))
+                        self.__output(left_value, right_value)
                 else:
-                    sys.stdout.write("{0}\t{1}\n".format(left_value, right_default_value))
+                    self.__output(left_value, right_default_value)
 
     def __right(self):
         left_key = None
@@ -141,9 +153,9 @@ class Reducer(object):
                 right_value = '\t'.join(fields[2:])
                 if fields[0] == left_key:
                     for left_value in left_value_list:
-                        sys.stdout.write("{0}\t{1}\n".format(left_value, right_value))
+                        self.__output(left_value, right_value)
                 else:
-                    sys.stdout.write("{0}\t{1}\n".format(left_default_value, right_value))
+                    self.__output(left_default_value, right_value)
 
     def __inner(self):
         right_key = None
@@ -161,7 +173,7 @@ class Reducer(object):
                 if fields[0] != right_key:
                     continue
                 for right_value in right_value_list:
-                    sys.stdout.write("{0}\t{1}\n".format(left_value, right_value))
+                    self.__output(left_value, right_value)
 
 
 def parse_args():
@@ -169,11 +181,11 @@ def parse_args():
     arg_parser.add_argument("-e", "--execute", required=True, help="Operations: map/reduce")
     arg_parser.add_argument("-m", "--method", help="Join method: left/right/inner")
     arg_parser.add_argument("--left_pattern", help="Left input path pattern.")
-    arg_parser.add_argument("--left_key", help = "Left input data keys.")
-    arg_parser.add_argument("--left_value", help = "Left input data values.")
+    arg_parser.add_argument("--left_key", help="Left input data keys.")
+    arg_parser.add_argument("--left_value", nargs='?', help="Left input data values.")
     arg_parser.add_argument("--right_pattern", help="Right input path pattern.")
-    arg_parser.add_argument("--right_key", help = "Right input data keys.")
-    arg_parser.add_argument("--right_value", help = "Right input data values.")
+    arg_parser.add_argument("--right_key", help="Right input data keys.")
+    arg_parser.add_argument("--right_value", nargs='?', help="Right input data values.")
     return arg_parser.parse_args()
 
 if __name__ == '__main__':
