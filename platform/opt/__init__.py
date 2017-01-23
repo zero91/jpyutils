@@ -15,5 +15,6 @@ __load_librbary()
 
 from . import configure
 from . import hadoop
+from .monitor import Monitor
 
-__all__ = ['hadoop', 'configure']
+__all__ = ['hadoop', 'configure', 'Monitor']

@@ -13,6 +13,7 @@ import threading
 import time
 import re
 import shutil
+import datetime
 import xml.etree.ElementTree as ET
 
 class Hadoop(object):
@@ -459,7 +460,8 @@ class Hadoop(object):
         Returns
         -------
         sub_path_list: list
-            All subdirectories or files of the path.
+            All subdirectories or files of the path and its timestamp, format as:
+                    [(path1, timestamp1), (path2, timestamp2), ...]
 
         """
         hadoop_env = self.__using_hadoop_env(hadoop_env)
@@ -480,13 +482,14 @@ class Hadoop(object):
                 pattern = r'.*'
             pattern_inst = re.compile('(%s)(/){0,1}(%s)' % (path.replace('*', '.*'), pattern))
             for line in stdout_val.strip().split('\n'):
-                last_space = line.rfind(' /')
-                if last_space == -1 or last_space >= len(line):
+                fields = line.split()
+                if len(fields) != 8:
                     continue
 
-                fname = line[last_space + 1:]
+                day, hour, fname = fields[-3:]
                 if re.match(pattern_inst, fname):
-                    sub_path_list.append(fname)
+                    ftime = time.strptime("{0} {1}".format(day, hour), "%Y-%m-%d %H:%M")
+                    sub_path_list.append((fname, int(time.mktime(ftime))))
             return sub_path_list
 
         elif isinstance(path, (list, tuple, set, dict)):
