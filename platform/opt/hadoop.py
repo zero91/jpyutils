@@ -1,6 +1,8 @@
 """Tools for using hadoop.
 """
 # Author: Donald Cheung <jianzhang9102@gmail.com>
+from jpyutils import runner
+
 import os
 import sys
 import signal
@@ -9,11 +11,9 @@ import collections
 import md5
 import threading
 import time
-import xml.etree.ElementTree as ET
-
-from jpyutils import runner
-
 import re
+import shutil
+import xml.etree.ElementTree as ET
 
 class Hadoop(object):
     """Tools for using hadoop more convenient.
@@ -429,9 +429,10 @@ class Hadoop(object):
         """
         hadoop_env = self.__using_hadoop_env(hadoop_env)
         proc = subprocess.Popen(["{0}/bin/hadoop".format(self.__hadoop_env[hadoop_env]['path']),
-                                            "fs", "-cat", hadoop_path],
-                                    stdout=subprocess.PIPE,
-                                    stderr=subprocess.PIPE)
+                                            "fs", "-cat", hadoop_path
+                                ],
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE)
         stdout_value, stderr_value = proc.communicate()
         if proc.returncode != 0:
             if default is not None:
@@ -823,14 +824,82 @@ class Hadoop(object):
                               map_sorted_key_num=2,
                               **params)
 
-    def download(self, hadoop_path, local_path, hadoop_env=None):
-        pass
+    def download(self, hadoop_path, local_path, clear_output=False, hadoop_env=None):
+        """Download hadoop data to local path.
 
-    def upload(self, local_path, hadoop_path, hadoop_env=None):
-        pass
+        Parameters
+        ----------
+        hadoop_path: string
+            Hadoop data path.
 
-    def email(self, email, contents):
-        pass
+        local_path: string
+            Local saving path.
 
-    def done_file(self, hadoop_path, hadoop_env=None):
-        pass
+        clear_output: boolean, optional
+            Whether or not to remove local output path.
+
+        hadoop_env: string, optional
+            Hadoop environment's alias name.
+
+        Returns
+        -------
+        returncode: integer
+            Exit code of this hadoop downloading job.
+
+        """
+        hadoop_env = self.__using_hadoop_env(hadoop_env)
+        if clear_output is True:
+            shutil.rmtree(local_path)
+
+        local_parent_path = os.path.dirname(os.path.realpath(local_path))
+        if not os.path.exists(local_parent_path):
+            os.makedirs(local_parent_path)
+
+        return subprocess.Popen(["{0}/bin/hadoop".format(self.__hadoop_env[hadoop_env]['path']),
+                                            "fs", "-get", hadoop_path, local_path
+                                ],
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE).wait()
+
+    def upload(self, local_path, hadoop_path, clear_output=False, hadoop_env=None, verbose=True):
+        """Upload a local data to hadoop.
+
+        Parameters
+        ----------
+        local_path: string
+            Local data path.
+
+        hadoop_path: string
+            Hadoop upload path.
+
+        clear_output: boolean, optional
+            Whether or not to remove hadoop output path.
+
+        hadoop_env: string, optional
+            Hadoop environment's alias name.
+
+        verbose: boolean, optional
+            Output all distcp command log if set True.
+
+        Returns
+        -------
+        returncode: integer
+            Exit code of this hadoop upload job.
+
+        """
+        hadoop_env = self.__using_hadoop_env(hadoop_env)
+        if clear_output is True:
+            self.remove_path(hadoop_path, hadoop_env=hadoop_env)
+
+        if verbose is True:
+            proc_stderr = None
+            proc_stdout = None
+        else:
+            proc_stdout = subprocess.PIPE
+            proc_stderr = subprocess.PIPE
+
+        return subprocess.Popen(["{0}/bin/hadoop".format(self.__hadoop_env[hadoop_env]['path']),
+                                            "fs", "-put", local_path, hadoop_path
+                                ],
+                                stdout=proc_stdout,
+                                stderr=proc_stderr).wait()

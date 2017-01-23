@@ -9,6 +9,8 @@ import operator
 import argparse
 
 def map_input_match(pattern):
+    """Match map input file name to join input path pattern.
+    """
     current_file = os.getenv('map_input_file')
     if current_file is None:
         sys.stderr.write("current file got by env `map_input_file' is None\n")
@@ -22,6 +24,8 @@ def map_input_match(pattern):
 
 
 class Mapper(object):
+    """Join Mapper class, used to fetch key/value from source data.
+    """
     def __init__(self, args):
         self.__method = args.method
         self.__left_pattern = re.compile(args.left_pattern)
@@ -41,6 +45,8 @@ class Mapper(object):
                 self.__right_value_list.append((int(idx), default))
 
     def run(self):
+        """fetch key/value from source data.
+        """
         if self.__method == "left" or self.__method == "inner":
             left_tag = 1
             right_tag = 0
@@ -79,6 +85,8 @@ class Mapper(object):
 
 
 class Reducer(object):
+    """Join Reducer class, used to join data for difference joining method.
+    """
     def __init__(self, method, left_value, right_value):
         self.__method = method 
         self.__left_value_list = list()
@@ -94,6 +102,8 @@ class Reducer(object):
                 self.__right_value_list.append((int(idx), default))
 
     def run(self):
+        """Joining data.
+        """
         if self.__method == "left":
             self.__left()
 
