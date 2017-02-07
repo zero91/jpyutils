@@ -246,7 +246,7 @@ class Hadoop(object):
         archives.append("/share/python2.7.tar.gz#python")
         if 'archives' in params and params['archives'] is not None:
             archives_list = list()
-            if isinstance(params['archives'], str):
+            if isinstance(params['archives'], (str, unicode)):
                 archives_list = map(str.strip, params['archives'].split(','))
             elif isinstance(params['archives'], (list, tuple, set, dict)):
                 archives_list = map(str.strip, params['archives'])
@@ -260,7 +260,7 @@ class Hadoop(object):
         if "upload_files" in params and params['upload_files'] is not None:
             upload_files = params['upload_files']
             upload_files_list = list()
-            if isinstance(upload_files, str):
+            if isinstance(upload_files, (str, unicode)):
                 upload_files_list = map(str.strip, upload_files.split(','))
             elif isinstance(upload_files, (list, tuple, set, dict)):
                 upload_files_list = map(str.strip, upload_files)
@@ -273,7 +273,7 @@ class Hadoop(object):
         streaming_conf['file_param'] = file_param
 
         input_path_list = list()
-        if isinstance(input_path, str):
+        if isinstance(input_path, (str, unicode)):
             input_path_list = map(str.strip, input_path.split(','))
         elif isinstance(input_path, (list, tuple, set, dict)):
             input_path_list = map(str.strip, input_path)
@@ -465,7 +465,7 @@ class Hadoop(object):
 
         """
         hadoop_env = self.__using_hadoop_env(hadoop_env)
-        if isinstance(path, str):
+        if isinstance(path, (str, unicode)):
             path_list = path.split(',')
             if len(path_list) > 1:
                 return self.list_path(path_list, pattern, hadoop_env)
@@ -522,7 +522,7 @@ class Hadoop(object):
 
         """
         hadoop_env = self.__using_hadoop_env(hadoop_env)
-        if isinstance(path, str):
+        if isinstance(path, (str, unicode)):
             path_list = path.split(',')
             if len(path_list) > 1:
                 return self.list_path_size(path_list, hadoop_env)
@@ -685,7 +685,7 @@ class Hadoop(object):
     def __join_keys(self, keys):
         if isinstance(keys, int):
             key_list = [keys]
-        elif isinstance(keys, str):
+        elif isinstance(keys, (str, unicode)):
             key_list = map(int, keys.split(','))
         elif isinstance(keys, (list, tuple, set, dict)):
             key_list = list(keys)
@@ -703,7 +703,7 @@ class Hadoop(object):
 
         if isinstance(values, int):
             value_list = [(values, None)]
-        elif isinstance(values, str):
+        elif isinstance(values, (str, unicode)):
             for value in values.split(','):
                 if value.isdigit():
                     value_list.append((int(value), None))
@@ -724,7 +724,7 @@ class Hadoop(object):
 
     def __join_input_pattern(self, path):
         path_list = list()
-        if isinstance(path, str):
+        if isinstance(path, (str, unicode)):
             path_list = path.split(',')
         elif isinstance(path, (list, tuple, set, dict)):
             path_list = list(path)
@@ -809,12 +809,12 @@ class Hadoop(object):
 
         upload_files = "{0}/_join_mapred.py".format(os.path.realpath(os.path.dirname(__file__)))
         input_path_list = list()
-        if isinstance(left_input, str):
+        if isinstance(left_input, (str, unicode)):
             input_path_list.extend(left_input.split(','))
         elif isinstance(left_input, (list, tuple, set, dict)):
             input_path_list.extend(left_input)
 
-        if isinstance(right_input, str):
+        if isinstance(right_input, (str, unicode)):
             input_path_list.extend(right_input.split(','))
         elif isinstance(right_input, (list, tuple, set, dict)):
             input_path_list.extend(right_input)
