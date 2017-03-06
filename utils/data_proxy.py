@@ -1,6 +1,12 @@
+# coding: utf-8
+# Author: Donald Cheung <jianzhang9102@gmail.com>
+"""Utility for manipulating data.
+"""
 import operator
 
 class SchemaWrapper(object):
+    """Accessing data from pre-set schema.
+    """
     def __init__(self, schema, fixed=True):
         """
         Parameters
