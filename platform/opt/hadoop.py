@@ -434,6 +434,7 @@ class Hadoop(object):
                                 ],
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE)
+        # TODO change to generator to improve efficiency
         stdout_value, stderr_value = proc.communicate()
         if proc.returncode != 0:
             if default is not None:
@@ -852,7 +853,7 @@ class Hadoop(object):
         """
         hadoop_env = self.__using_hadoop_env(hadoop_env)
         if clear_output is True:
-            shutil.rmtree(local_path)
+            shutil.rmtree(local_path, ignore_errors=True)
 
         local_parent_path = os.path.dirname(os.path.realpath(local_path))
         if not os.path.exists(local_parent_path):
