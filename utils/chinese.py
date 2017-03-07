@@ -4,7 +4,7 @@
 """
 import os
 
-def is_chinese_char(uchar, encoding=None):
+def is_chinese_char(uchar, encoding='utf-8'):
     """Return True is uchar is a chinese char, otherwise return False.
     If uchar's length does not equal to 1, return False directly.
 
@@ -34,10 +34,7 @@ def is_chinese_char(uchar, encoding=None):
 
     """
     if not isinstance(uchar, unicode):
-        if encoding is not None:
-            uchar = uchar.decode(encoding)
-        else:
-            uchar = uchar.decode('utf-8')
+        uchar = uchar.decode(encoding)
 
     if len(uchar) != 1:
         return False
@@ -48,7 +45,7 @@ def is_chinese_char(uchar, encoding=None):
         return False
 
  
-def contains_chinese(cstring, encoding=None):
+def contains_chinese(cstring, encoding='utf-8'):
     """Return True is cstring contains chinese chars, otherwise return False.
 
     Parameters
@@ -66,10 +63,7 @@ def contains_chinese(cstring, encoding=None):
 
     """
     if not isinstance(cstring, unicode):
-        if encoding is not None:
-            cstring = cstring.decode(encoding)
-        else:
-            cstring = cstring.decode('utf-8')
+        cstring = cstring.decode(encoding)
 
     for cchar in cstring:
         if is_chinese_char(cchar):
@@ -77,7 +71,7 @@ def contains_chinese(cstring, encoding=None):
     return False
 
 
-def half2width(cstring, encoding=None):
+def half2width(cstring, encoding='utf-8'):
     """Transform a half angle string to width angle.
 
     Parameters
@@ -103,10 +97,7 @@ def half2width(cstring, encoding=None):
 
     """
     if not isinstance(cstring, unicode):
-        if encoding is not None:
-            cstring = cstring.decode(encoding)
-        else:
-            cstring = cstring.decode('utf-8')
+        cstring = cstring.decode(encoding)
 
     transformed_list = list()
     for cchar in cstring:
@@ -120,7 +111,7 @@ def half2width(cstring, encoding=None):
     return "".join([c if encoding is None else c.encode(encoding) for c in transformed_list])
 
  
-def width2half(cstring, encoding=None):
+def width2half(cstring, encoding='utf-8'):
     """Transform a width angle string to half angle.
 
     Parameters
@@ -146,10 +137,7 @@ def width2half(cstring, encoding=None):
 
     """
     if not isinstance(cstring, unicode):
-        if encoding is not None:
-            cstring = cstring.decode(encoding)
-        else:
-            cstring = cstring.decode('utf-8')
+        cstring = cstring.decode(encoding)
 
     transformed_list = list()
     for cchar in cstring:
@@ -178,7 +166,7 @@ class PinYin(object):
             key, value = line[:-1].split('\t', 1)
             self.word_pinyin[key] = value
 
-    def transform(self, cstring, encoding=None, tone=False):
+    def transform(self, cstring, encoding='utf-8', tone=False):
         """Return cstring's pinyin.
 
         Parameters
@@ -200,10 +188,7 @@ class PinYin(object):
         """
         origin_type = type(cstring)
         if not isinstance(cstring, unicode):
-            if encoding is not None:
-                cstring = cstring.decode(encoding)
-            else:
-                cstring = cstring.decode('utf-8')
+            cstring = cstring.decode(encoding)
 
         result = []
         for char in cstring:
