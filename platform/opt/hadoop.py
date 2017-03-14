@@ -280,7 +280,7 @@ class Hadoop(object):
         else:
             raise ValueError('unsupported type for input_path [{0}]'.format(input_path))
 
-        input_path_list = filter(lambda i: len(i) > 0, input_path_list)
+        input_path_list = sorted(set(filter(lambda i: len(i) > 0, input_path_list)))
         if len(input_path_list) == 0:
             raise ValueError("at least one valid input path should be specified")
         streaming_conf['input_path'] = " -input ".join(input_path_list)
