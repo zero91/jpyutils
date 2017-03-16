@@ -28,3 +28,27 @@ def is_float(s):
     """
     return re.match(re.compile("^[-+]?[0-9]+(?:\.[0-9]+)?(?:[eE][-+]?[0-9]+)?$"), s) is not None
 
+
+def check_version(version, minimum_version, sep='.'):
+    """Check whether verion satisfy the minimum version requirements.
+
+    Parameters
+    ----------
+    version : string
+        string of version.
+
+    minimum_version : string
+        string of minimum version.
+
+    sep : string
+        version inner separator.
+
+    Returns
+    -------
+    satisfied : boolean
+        True if satisfied requirements, otherwise False.
+
+    """
+    version = map(int, version.split(sep))
+    minimum_version = map(int, minimum_version.split(sep))
+    return version >= minimum_version
