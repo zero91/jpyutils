@@ -609,7 +609,7 @@ class Hadoop(object):
             hadoop_env = dest_hadoop_env
 
         if clear_output:
-            self.remove_path(dest_path, hadoop_env)
+            self.remove_path(dest_path, dest_hadoop_env)
 
         distcp_conf = dict()
         distcp_conf['hadoop_env'] = self.__hadoop_env[hadoop_env]['path']

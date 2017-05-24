@@ -133,7 +133,7 @@ class MultiTaskRunner(object):
             if match_str not in self.__render_arguments:
                 raise KeyError("missing value for render argument {0}".format(match_str))
 
-        def __lookup_func(self, reg_match):
+        def __lookup_func(reg_match):
             return self.__render_arguments[reg_match.group(1).strip()]
         tasks_str = render_arg_pattern.sub(__lookup_func, tasks_str)
 

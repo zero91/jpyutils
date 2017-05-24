@@ -7,6 +7,8 @@ gtest
 protobuf
 gflags
 boost
+zeromq
+cityhash -> No history version, only using latest version
 ----------------------------------
 """
 from .. import runner
@@ -32,19 +34,28 @@ class ModuleBuilder(object):
             repository version.
 
         clever : boolean, optional (default True)
-            asdf 
-            
+            Automatically calculate repository saving path. If set True, paste `name' to
+            `repo_path' if `name' is not the leaf direcotory of `repo_path', otherwise
+            using `repo_path'.
+
         Returns
         -------
         run_code: integer
             Build tasks' exit code.
+
+        Notes
+        -----
+        minimum version
+            protobuf: 3.0.2
+
+            cityhash: latest
 
         """
         if clever is True and os.path.basename(repo_path) != name:
             repo_path = "{0}/{1}".format(repo_path, name)
 
         build_path = os.path.realpath("{0}/{1}".format(repo_path, version))
-        if os.path.exists(build_path):
+        if os.path.exists(build_path) and len(list(os.walk(build_path))) > 0:
             return 0
 
         code_path = "{0}/code".format(repo_path)
@@ -163,11 +174,54 @@ class ModuleBuilder(object):
                     "command": ["./b2", "install"],
                     "cwd": "{0}/boost_{1}".format(code_path, version.replace(".", "_")),
                 }
-            )
+            ),
+            "zeromq": (
+                {
+                    "command": ["git", "clone", "https://github.com/zeromq/libzmq", code_path],
+                },
+                {
+                    "command": ["git", "checkout", "v{0}".format(version)],
+                    "cwd": code_path,
+                },
+                {
+                    "command": ["./autogen.sh"],
+                    "cwd": code_path,
+                },
+                {
+                    "command": ["./configure", "--prefix={0}".format(build_path)],
+                    "cwd": code_path,
+                },
+                {
+                    "command": ["make", "-j4"],
+                    "cwd": code_path,
+                },
+                {
+                    "command": ["make", "install"],
+                    "cwd": code_path
+                },
+            ),
+            "cityhash" : (
+                {
+                    "command": ["git", "clone", "https://github.com/google/cityhash", code_path],
+                },
+                {
+                    "command": ["./configure", "--prefix={0}".format(build_path)],
+                    "cwd": code_path,
+                },
+                {
+                    "command": "make all check CXXFLAGS=\"-g -O3\"",
+                    "cwd": code_path,
+                    "shell": True,
+                },
+                {
+                    "command": ["make", "install"],
+                    "cwd": code_path
+                },
+            ),
         }
 
         if name not in module_build_commands:
-            raise KeyError("repo [{0}] does not been supported yet")
+            raise KeyError("repo [{0}] does not been supported yet".format(name))
 
         builder = runner.MultiTaskRunner(parallel_degree=1)
         for command_info in module_build_commands[name]:
@@ -176,7 +230,7 @@ class ModuleBuilder(object):
         pub_real_path = os.path.realpath("{0}/publish".format(repo_path))
         if not os.path.exists(pub_real_path) \
                     or check.check_version(version, os.path.basename(pub_real_path)):
-            command = ["ln", "-F", "-s", version, "publish"]
+            command = ["ln", "-snf", version, "publish"]
             builder.add(command=command, cwd=repo_path, name=" ".join(command))
         return builder.run()
 
