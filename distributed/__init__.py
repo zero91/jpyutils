@@ -1,6 +1,6 @@
 """
-Usefull tools for hadoop.
-===========================
+Useful utilities for using distributed platform.
+================================================
 """
 
 from . import hadoop
