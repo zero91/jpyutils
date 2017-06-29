@@ -1,3 +1,4 @@
+#coding: utf-8
 """Fetch and processing opensources tools for self use.
 
 Currently support following tools:
@@ -9,6 +10,11 @@ gflags
 boost
 zeromq
 cityhash -> No history version, only using latest version
+
+TODO LIST:
+1) cpp-btree-1.0.1 (google)
+2) hiredis
+
 ----------------------------------
 """
 from .. import runner
