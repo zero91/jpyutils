@@ -82,11 +82,11 @@ class ModuleBuilder(object):
                     "cwd": code_path
                 },
                 {
-                    "command": ["make", "-j4"],
+                    "command": ["autoreconf", "-i"],
                     "cwd": code_path
                 },
                 {
-                    "command": ["autoreconf", "-i"],
+                    "command": ["make", "-j4"],
                     "cwd": code_path
                 },
                 {
