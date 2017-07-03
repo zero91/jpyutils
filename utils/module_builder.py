@@ -86,6 +86,10 @@ class ModuleBuilder(object):
                     "cwd": code_path
                 },
                 {
+                    "command": ["autoreconf", "-i"],
+                    "cwd": code_path
+                },
+                {
                     "command": ["make", "install"],
                     "cwd": code_path
                 }
