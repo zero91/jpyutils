@@ -166,7 +166,8 @@ class ModuleBuilder(object):
                 {
                     "command": ["wget", "-c", "-P", code_path, "https://nchc.dl.sourceforge.net"\
                                         "/project/boost/boost/{0}/boost_{1}.tar.gz".format(
-                                                    version, version.replace(".", "_"))],
+                                                    version, version.replace(".", "_")),
+                                                    "--no-check-certificate" ],
                 },
                 {
                     "command": ["tar", "-C", code_path, "-xzf", "{0}/boost_{1}.tar.gz".format(
