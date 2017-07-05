@@ -530,7 +530,7 @@ class Hadoop(object):
                                                     stderr=subprocess.PIPE)
             stdout_val, stderr_val = process.communicate()
             if process.returncode != 0:
-                raise ValueError("can't access {0}, ERROR {1}".format(path, stderr_val))
+                raise ValueError("access [{0}] failed, info [{1}]".format(path, stderr_val))
 
             sub_path_list = list()
             if pattern is None:
@@ -598,6 +598,8 @@ class Hadoop(object):
                 fname = path_name.split('//', 1)[1]
                 fname = fname[fname.index('/'):]
                 yield (fname, int(size))
+        if proc.returncode != 0:
+            raise ValueError("access [{0}] failed, info [{1}]".format(path, proc.stderr.read()))
 
     def distcp(self, src_hadoop_env, src_path, dest_hadoop_env, dest_path, clear_output=False,
                                                                            hadoop_env=None,
