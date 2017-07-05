@@ -487,8 +487,9 @@ class Hadoop(object):
                                 ],
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE)
-        for line in iter(proc.stdout.readline, b''):
-            yield line
+        while proc.poll() is None:
+            for line in iter(proc.stdout.readline, b''):
+                yield line
 
         if proc.returncode != 0:
             if default is not None:
@@ -588,14 +589,15 @@ class Hadoop(object):
         cmd.extend(path_list)
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-        for line in iter(proc.stdout.readline, b''):
-            fields = line.strip().split('\t')
-            if len(fields) != 2:
-                continue
-            (path_name, size) = fields
-            fname = path_name.split('//', 1)[1]
-            fname = fname[fname.index('/'):]
-            yield (fname, int(size))
+        while proc.poll() is None:
+            for line in iter(proc.stdout.readline, b''):
+                fields = line.strip().split('\t')
+                if len(fields) != 2:
+                    continue
+                (path_name, size) = fields
+                fname = path_name.split('//', 1)[1]
+                fname = fname[fname.index('/'):]
+                yield (fname, int(size))
 
     def distcp(self, src_hadoop_env, src_path, dest_hadoop_env, dest_path, clear_output=False,
                                                                            hadoop_env=None,
