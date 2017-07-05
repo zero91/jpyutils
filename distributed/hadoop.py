@@ -354,381 +354,6 @@ class Hadoop(object):
         self.add_hadoop_env(new_env_name, hadoop_env_path)
         return new_env_name
 
-    def run_streaming(self, cmd, clear_output=False, retry=1, verbose=True):
-        """Running a streaming command.
-
-        Parameters
-        ----------
-        cmd: string
-            The streaming command to run.
-
-        clear_output: boolean, optional
-            Whether or not clear output path before running this job.
-
-        retry: integer, optional
-            Try at most `retry' times.
-
-        verbose: boolean, optional
-            Output streaming job's log if set True.
-            
-        Returns
-        -------
-        returncode: integer
-            Exit code of this hadoop streaming job.
-
-        """
-        pre_sigint_handler = signal.signal(signal.SIGINT, self.__kill_handler)
-        pre_sigterm_handler = signal.signal(signal.SIGTERM, self.__kill_handler)
-
-        hadoop_env = self.__find_hadoop_env(cmd.split(' streaming ', 1)[0].strip())
-        if clear_output:
-            output_path = cmd.split(" -output ")[-1].strip().split(' ', 1)[0]
-            self.remove(output_path, hadoop_env)
-
-        process = runner.TaskRunner(cmd, shell=True, stdout=subprocess.PIPE,
-                                                     stderr=subprocess.PIPE,
-                                                     retry=retry)
-        self.__access_lock.acquire()
-        idx = len(self.__necessary_info4clean)
-        self.__necessary_info4clean.append([process, hadoop_env, None])
-        process.start()
-        self.__access_lock.release()
-
-        while process.stderr is None:
-            time.sleep(0.1)
-
-        while True:
-            line = process.stderr.readline()
-            if len(line) == 0 and not process.is_alive():
-                break
-
-            if "INFO mapred.JobClient: Running job" in line:
-                jobid = line.strip().split(" ")[-1]
-                self.__necessary_info4clean[idx][2] = jobid
-            verbose and sys.stderr.write(line)
-
-        while process.is_alive():
-            time.sleep(0.1)
-
-        signal.signal(signal.SIGINT, pre_sigint_handler)
-        signal.signal(signal.SIGTERM, pre_sigterm_handler)
-        return process.returncode
-
-    def remove(self, hadoop_path, hadoop_env=None):
-        """Remove a path.
-
-        Parameters
-        ----------
-        hadoop_path: string
-            The path to be removed.
-
-        hadoop_env: string, optional
-            Alias name of hadoop environment.
-
-        Returns
-        -------
-        result: integer 
-            0 if the path been removed successfully, otherwise non zero.
-
-        """
-        hadoop_env = self.__using_hadoop_env(hadoop_env)
-        return subprocess.Popen(["{0}/bin/hadoop".format(self.__hadoop_env[hadoop_env]['path']),
-                                            "fs", "-rmr", hadoop_path],
-                                stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE).wait()
-
-    def mkdir(self, hadoop_path, hadoop_env=None):
-        """Create a path.
-
-        Parameters
-        ----------
-        hadoop_path: string
-            The path to be created.
-
-        hadoop_env: string, optional
-            Alias name of hadoop environment.
-
-        Returns
-        -------
-        result: integer 
-            0 if the path been created successfully, otherwise non zero.
-
-        """
-        hadoop_env = self.__using_hadoop_env(hadoop_env)
-        return subprocess.Popen(["{0}/bin/hadoop".format(self.__hadoop_env[hadoop_env]['path']),
-                                            "fs", "-mkdir", hadoop_path],
-                                stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE).wait()
-
-    def fetch_content(self, hadoop_path, default=None, hadoop_env=None):
-        """Fetch a content from a path.
-
-        Parameters
-        ----------
-        hadoop_path : string
-            File's hadoop path.
-
-        default: string, optional
-            If `hadoop_path' does not exist, raise an exception if `default' is None,
-            otherwise return `default'.
-
-        hadoop_env: string, optional
-            Hadoop environment's alias name.
-
-        Returns
-        -------
-        generator: generator
-            A generator, which generate content result.
-        
-        """
-        hadoop_env = self.__using_hadoop_env(hadoop_env)
-        proc = subprocess.Popen(["{0}/bin/hadoop".format(self.__hadoop_env[hadoop_env]['path']),
-                                            "fs", "-cat", hadoop_path
-                                ],
-                                stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE)
-        while proc.poll() is None:
-            for line in iter(proc.stdout.readline, b''):
-                yield line
-
-        if proc.returncode != 0:
-            if default is not None:
-                yield default
-            else:
-                raise UserWarning("Fetch content of [{0}] failed, ERROR INFO [{1}] ".format(
-                                            hadoop_path, proc.stderr.read()))
-
-    def list_path(self, path, pattern=None, hadoop_env=None):
-        """List hadoop paths.
-
-        Parameters
-        ----------
-        path: string/list/tuple/set/dict
-            The parent directory.
-
-        pattern : string, optional
-            The pattern which the subdirectory or files should be satisfied.
-
-        hadoop_env: string, optional
-            Hadoop environment's alias name.
-
-        Returns
-        -------
-        sub_path_list: list
-            All subdirectories or files of the path and its timestamp, format as:
-                    [(path1, timestamp1), (path2, timestamp2), ...]
-
-        """
-        hadoop_env = self.__using_hadoop_env(hadoop_env)
-        if isinstance(path, basestring):
-            path_list = path.split(',')
-            if len(path_list) > 1:
-                return self.list_path(path_list, pattern, hadoop_env)
-            hadoop_path = self.__hadoop_env[hadoop_env]['path']
-            process = subprocess.Popen(["{0}/bin/hadoop".format(hadoop_path), "fs", "-ls", path],
-                                                    stdout=subprocess.PIPE,
-                                                    stderr=subprocess.PIPE)
-            stdout_val, stderr_val = process.communicate()
-            if process.returncode != 0:
-                raise ValueError("access [{0}] failed, info [{1}]".format(path, stderr_val))
-
-            sub_path_list = list()
-            if pattern is None:
-                pattern = r'.*'
-            pattern_inst = re.compile('(%s)(/){0,1}(%s)' % (path.replace('*', '.*'), pattern))
-            for line in stdout_val.strip().split('\n'):
-                fields = line.split()
-                if len(fields) != 8:
-                    continue
-
-                day, hour, fname = fields[-3:]
-                if re.match(pattern_inst, fname):
-                    ftime = time.strptime("{0} {1}".format(day, hour), "%Y-%m-%d %H:%M")
-                    sub_path_list.append((fname, int(time.mktime(ftime))))
-            return sub_path_list
-
-        elif isinstance(path, (list, tuple, set, dict)):
-            path_res = list()
-            for p in path:
-                path_res.append(self.list_path(p, pattern, hadoop_env))
-            return path_res
-
-        else:
-            raise ValueError("format of {0} does not supported".format(path))
-
-    def list_path_size(self, path, hadoop_env=None):
-        """List size of paths.
-
-        Parameters
-        ----------
-        path: string/list/tuple/set/dict
-            The path to be listed.
-
-        hadoop_env: string, optional
-            Hadoop environment's alias name.
-
-        Returns
-        -------
-        generator: generator
-            A generator, which generate all path size list.
-            Format as follows:
-                [(sub1_path1, size1), (sub1_path2, size2), ...]
-
-        """
-        hadoop_env = self.__using_hadoop_env(hadoop_env)
-        path_list = list()
-        if isinstance(path, basestring):
-            path_list = map(str.strip, path.split(','))
-        elif isinstance(path, (list, tuple, set, dict)):
-            path_list = map(str.strip, path)
-        else:
-            raise ValueError("format of {0} does not supported".format(path))
-
-        hadoop_env_path = self.__hadoop_env[hadoop_env]['path']
-        cmd = ["{0}/bin/hadoop".format(hadoop_env_path), "fs", "-dus"]
-        cmd.extend(path_list)
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-        while proc.poll() is None:
-            for line in iter(proc.stdout.readline, b''):
-                fields = line.strip().split('\t')
-                if len(fields) != 2:
-                    continue
-                (path_name, size) = fields
-                fname = path_name.split('//', 1)[1]
-                fname = fname[fname.index('/'):]
-                yield (fname, int(size))
-        if proc.returncode != 0:
-            raise ValueError("access [{0}] failed, info [{1}]".format(path, proc.stderr.read()))
-
-    def distcp(self, src_hadoop_env, src_path, dest_hadoop_env, dest_path, clear_output=False,
-                                                                           hadoop_env=None,
-                                                                           verbose=True,
-                                                                           priority='NORMAL',
-                                                                           map_capacity=500,
-                                                                           map_speed=10485760):
-        """Copy files between two hadoop clusters.
-
-        Parameters
-        ----------
-        src_hadoop_env: string
-            Hadoop environment's alias name of source path.
-
-        src_path: string
-            Source path.
-
-        dest_hadoop_env: string
-            Hadoop environment's alias name of dest path.
-
-        dest_path: string
-            Dest path.
-
-        clear_output: boolean, optional
-            Whether or not to remove output path.
-
-        hadoop_env: string, optional
-            Hadoop environment's alias name form executing distcp job.
-            Default to be equal to dest_hadoop_env.
-
-        verbose: boolean, optional
-            Output all distcp command log if set True.
-
-        priority: string, optional
-            distcp job's priority.
-
-        map_capacity: integer, optional
-            distcp job's map capacity.
-
-        map_speed: integer, optional
-            distcp job's copy speed.
-
-        Returns
-        -------
-        result: integer
-            distcp job's exit code.
-
-        """
-        pre_sigint_handler = signal.signal(signal.SIGINT, self.__kill_handler)
-        pre_sigterm_handler = signal.signal(signal.SIGTERM, self.__kill_handler)
-
-        if hadoop_env is None:
-            hadoop_env = dest_hadoop_env
-
-        if clear_output:
-            self.remove(dest_path, dest_hadoop_env)
-
-        distcp_conf = dict()
-        distcp_conf['hadoop_env'] = self.__hadoop_env[hadoop_env]['path']
-        distcp_conf['map_capacity'] = map_capacity
-        distcp_conf['map_speed'] = map_speed
-        distcp_conf['priority'] = priority
-        distcp_conf['src_ugi'] = self.__hadoop_env[src_hadoop_env]['hadoop.job.ugi']
-        distcp_conf['dest_ugi'] = self.__hadoop_env[dest_hadoop_env]['hadoop.job.ugi']
-        distcp_conf['src_fs_default_name'] = self.__hadoop_env[src_hadoop_env]['fs.default.name']
-        distcp_conf['dest_fs_default_name'] = self.__hadoop_env[dest_hadoop_env]['fs.default.name']
-        distcp_conf['src_path'] = src_path
-        distcp_conf['dest_path'] = dest_path
-
-        distcp_cmd = '{hadoop_env}/bin/hadoop distcp' \
-                            ' -D mapred.job.map.capacity={map_capacity}' \
-                            ' -D distcp.map.speed.kb={map_speed}' \
-                            ' -D mapred.job.priority={priority}' \
-                            ' -su {src_ugi}' \
-                            ' -du {dest_ugi}' \
-                            ' {src_fs_default_name}{src_path}' \
-                            ' {dest_fs_default_name}{dest_path}'
-        process = runner.TaskRunner(distcp_cmd.format(**distcp_conf), stdout=subprocess.PIPE,
-                                                                      stderr=subprocess.PIPE,
-                                                                      shell=True)
-        self.__access_lock.acquire()
-        idx = len(self.__necessary_info4clean)
-        self.__necessary_info4clean.append([process, hadoop_env, None])
-        process.start()
-        self.__access_lock.release()
-
-        while process.stderr is None:
-            time.sleep(0.1)
-
-        while True:
-            line = process.stderr.readline()
-            if len(line) == 0 and not process.is_alive():
-                break
-
-            if "INFO mapred.JobClient: Running job" in line:
-                jobid = line.strip().split(" ")[-1]
-                self.__necessary_info4clean[idx][2] = jobid
-            verbose and sys.stderr.write(line)
-
-        while process.is_alive():
-            time.sleep(0.1)
-
-        signal.signal(signal.SIGINT, pre_sigint_handler)
-        signal.signal(signal.SIGTERM, pre_sigterm_handler)
-        return process.returncode
-
-    def __kill_handler(self, signum, stack):
-        sys.stderr.write("\nReceive signal {0}, all jobs begin to terminate.\n".format(signum))
-        for (process, hadoop_env, jobid) in self.__necessary_info4clean:
-            if process is not None and process.is_alive():
-                process.terminate()
-
-            if jobid is None:
-                continue
-
-            tracker =self.__hadoop_env[hadoop_env]["mapred.job.tracker"]
-            hadoop_path = self.__hadoop_env[hadoop_env]['path']
-            returncode = subprocess.Popen(["{0}/bin/hadoop".format(hadoop_path), "job",
-                                                "-D", "mapred.job.tracker={0}".format(tracker),
-                                                "-kill", jobid
-                                            ],
-                                            stdout=subprocess.PIPE,
-                                            stderr=subprocess.PIPE).wait()
-            if returncode == 0:
-                sys.stderr.write("Terminate hadoop job {0} succeed\n".format(jobid))
-            else:
-                sys.stderr.write("Terminate hadoop job {0} failed\n".format(jobid))
-        exit(1)
-
     def __join_keys(self, keys):
         if isinstance(keys, int):
             key_list = [keys]
@@ -873,6 +498,407 @@ class Hadoop(object):
                               upload_files=upload_files,
                               map_sorted_key_num=2,
                               **params)
+
+    def run_streaming(self, cmd, clear_output=False, retry=1, verbose=True):
+        """Running a streaming command.
+
+        Parameters
+        ----------
+        cmd: string
+            The streaming command to run.
+
+        clear_output: boolean, optional
+            Whether or not clear output path before running this job.
+
+        retry: integer, optional
+            Try at most `retry' times.
+
+        verbose: boolean, optional
+            Output streaming job's log if set True.
+            
+        Returns
+        -------
+        returncode: integer
+            Exit code of this hadoop streaming job.
+
+        """
+        pre_sigint_handler = signal.signal(signal.SIGINT, self.__kill_handler)
+        pre_sigterm_handler = signal.signal(signal.SIGTERM, self.__kill_handler)
+
+        hadoop_env = self.__find_hadoop_env(cmd.split(' streaming ', 1)[0].strip())
+        if clear_output:
+            output_path = cmd.split(" -output ")[-1].strip().split(' ', 1)[0]
+            self.remove(output_path, hadoop_env)
+
+        process = runner.TaskRunner(cmd, shell=True, stdout=subprocess.PIPE,
+                                                     stderr=subprocess.PIPE,
+                                                     retry=retry)
+        self.__access_lock.acquire()
+        idx = len(self.__necessary_info4clean)
+        self.__necessary_info4clean.append([process, hadoop_env, None])
+        process.start()
+        self.__access_lock.release()
+
+        while process.stderr is None:
+            time.sleep(0.1)
+
+        while True:
+            line = process.stderr.readline()
+            if len(line) == 0 and not process.is_alive():
+                break
+
+            if "INFO mapred.JobClient: Running job" in line:
+                jobid = line.strip().split(" ")[-1]
+                self.__necessary_info4clean[idx][2] = jobid
+            verbose and sys.stderr.write(line)
+
+        while process.is_alive():
+            time.sleep(0.1)
+
+        signal.signal(signal.SIGINT, pre_sigint_handler)
+        signal.signal(signal.SIGTERM, pre_sigterm_handler)
+        return process.returncode
+
+    def distcp(self, src_hadoop_env, src_path, dest_hadoop_env, dest_path, clear_output=False,
+                                                                           hadoop_env=None,
+                                                                           verbose=True,
+                                                                           priority='NORMAL',
+                                                                           map_capacity=500,
+                                                                           map_speed=10485760):
+        """Copy files between two hadoop clusters.
+
+        Parameters
+        ----------
+        src_hadoop_env: string
+            Hadoop environment's alias name of source path.
+
+        src_path: string
+            Source path.
+
+        dest_hadoop_env: string
+            Hadoop environment's alias name of dest path.
+
+        dest_path: string
+            Dest path.
+
+        clear_output: boolean, optional
+            Whether or not to remove output path.
+
+        hadoop_env: string, optional
+            Hadoop environment's alias name form executing distcp job.
+            Default to be equal to dest_hadoop_env.
+
+        verbose: boolean, optional
+            Output all distcp command log if set True.
+
+        priority: string, optional
+            distcp job's priority.
+
+        map_capacity: integer, optional
+            distcp job's map capacity.
+
+        map_speed: integer, optional
+            distcp job's copy speed.
+
+        Returns
+        -------
+        result: integer
+            distcp job's exit code.
+
+        """
+        pre_sigint_handler = signal.signal(signal.SIGINT, self.__kill_handler)
+        pre_sigterm_handler = signal.signal(signal.SIGTERM, self.__kill_handler)
+
+        if hadoop_env is None:
+            hadoop_env = dest_hadoop_env
+
+        if clear_output:
+            self.remove(dest_path, dest_hadoop_env)
+
+        distcp_conf = dict()
+        distcp_conf['hadoop_env'] = self.__hadoop_env[hadoop_env]['path']
+        distcp_conf['map_capacity'] = map_capacity
+        distcp_conf['map_speed'] = map_speed
+        distcp_conf['priority'] = priority
+        distcp_conf['src_ugi'] = self.__hadoop_env[src_hadoop_env]['hadoop.job.ugi']
+        distcp_conf['dest_ugi'] = self.__hadoop_env[dest_hadoop_env]['hadoop.job.ugi']
+        distcp_conf['src_fs_default_name'] = self.__hadoop_env[src_hadoop_env]['fs.default.name']
+        distcp_conf['dest_fs_default_name'] = self.__hadoop_env[dest_hadoop_env]['fs.default.name']
+        distcp_conf['src_path'] = src_path
+        distcp_conf['dest_path'] = dest_path
+
+        distcp_cmd = '{hadoop_env}/bin/hadoop distcp' \
+                            ' -D mapred.job.map.capacity={map_capacity}' \
+                            ' -D distcp.map.speed.kb={map_speed}' \
+                            ' -D mapred.job.priority={priority}' \
+                            ' -su {src_ugi}' \
+                            ' -du {dest_ugi}' \
+                            ' {src_fs_default_name}{src_path}' \
+                            ' {dest_fs_default_name}{dest_path}'
+        process = runner.TaskRunner(distcp_cmd.format(**distcp_conf), stdout=subprocess.PIPE,
+                                                                      stderr=subprocess.PIPE,
+                                                                      shell=True)
+        self.__access_lock.acquire()
+        idx = len(self.__necessary_info4clean)
+        self.__necessary_info4clean.append([process, hadoop_env, None])
+        process.start()
+        self.__access_lock.release()
+
+        while process.stderr is None:
+            time.sleep(0.1)
+
+        while True:
+            line = process.stderr.readline()
+            if len(line) == 0 and not process.is_alive():
+                break
+
+            if "INFO mapred.JobClient: Running job" in line:
+                jobid = line.strip().split(" ")[-1]
+                self.__necessary_info4clean[idx][2] = jobid
+            verbose and sys.stderr.write(line)
+
+        while process.is_alive():
+            time.sleep(0.1)
+
+        signal.signal(signal.SIGINT, pre_sigint_handler)
+        signal.signal(signal.SIGTERM, pre_sigterm_handler)
+        return process.returncode
+
+    def __kill_handler(self, signum, stack):
+        sys.stderr.write("\nReceive signal {0}, all jobs begin to terminate.\n".format(signum))
+        for (process, hadoop_env, jobid) in self.__necessary_info4clean:
+            if process is not None and process.is_alive():
+                process.terminate()
+
+            if jobid is None:
+                continue
+
+            tracker =self.__hadoop_env[hadoop_env]["mapred.job.tracker"]
+            hadoop_path = self.__hadoop_env[hadoop_env]['path']
+            returncode = subprocess.Popen(["{0}/bin/hadoop".format(hadoop_path), "job",
+                                                "-D", "mapred.job.tracker={0}".format(tracker),
+                                                "-kill", jobid
+                                            ],
+                                            stdout=subprocess.PIPE,
+                                            stderr=subprocess.PIPE).wait()
+            if returncode == 0:
+                sys.stderr.write("Terminate hadoop job {0} succeed\n".format(jobid))
+            else:
+                sys.stderr.write("Terminate hadoop job {0} failed\n".format(jobid))
+        exit(1)
+
+    def fetch_content(self, hadoop_path, default=None, hadoop_env=None):
+        """Fetch a content from a path.
+
+        Parameters
+        ----------
+        hadoop_path : string
+            File's hadoop path.
+
+        default: string, optional
+            If `hadoop_path' does not exist, raise an exception if `default' is None,
+            otherwise return `default'.
+
+        hadoop_env: string, optional
+            Hadoop environment's alias name.
+
+        Returns
+        -------
+        generator: generator
+            A generator, which generate content result.
+        
+        """
+        hadoop_env = self.__using_hadoop_env(hadoop_env)
+        proc = subprocess.Popen(["{0}/bin/hadoop".format(self.__hadoop_env[hadoop_env]['path']),
+                                            "fs", "-cat", hadoop_path
+                                ],
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE)
+        while proc.poll() is None:
+            for line in iter(proc.stdout.readline, b''):
+                yield line
+
+        if proc.returncode != 0:
+            if default is not None:
+                yield default
+            else:
+                raise UserWarning("Fetch content of [{0}] failed, ERROR INFO [{1}] ".format(
+                                            hadoop_path, proc.stderr.read()))
+
+    def list_path(self, path, pattern=None, hadoop_env=None):
+        """List hadoop paths.
+
+        Parameters
+        ----------
+        path: string/list/tuple/set/dict
+            The parent directory.
+
+        pattern : string, optional
+            The pattern which the subdirectory or files should be satisfied.
+
+        hadoop_env: string, optional
+            Hadoop environment's alias name.
+
+        Returns
+        -------
+        sub_path_list: list
+            All subdirectories or files of the path and its timestamp, format as:
+                    [(path1, timestamp1), (path2, timestamp2), ...]
+
+        """
+        hadoop_env = self.__using_hadoop_env(hadoop_env)
+        if isinstance(path, basestring):
+            path_list = path.split(',')
+            if len(path_list) > 1:
+                return self.list_path(path_list, pattern, hadoop_env)
+            hadoop_path = self.__hadoop_env[hadoop_env]['path']
+            process = subprocess.Popen(["{0}/bin/hadoop".format(hadoop_path), "fs", "-ls", path],
+                                                    stdout=subprocess.PIPE,
+                                                    stderr=subprocess.PIPE)
+            stdout_val, stderr_val = process.communicate()
+            if process.returncode != 0:
+                raise ValueError("access [{0}] failed, info [{1}]".format(path, stderr_val))
+
+            sub_path_list = list()
+            if pattern is None:
+                pattern = r'.*'
+            pattern_inst = re.compile('(%s)(/){0,1}(%s)' % (path.replace('*', '.*'), pattern))
+            for line in stdout_val.strip().split('\n'):
+                fields = line.split()
+                if len(fields) != 8:
+                    continue
+
+                day, hour, fname = fields[-3:]
+                if re.match(pattern_inst, fname):
+                    ftime = time.strptime("{0} {1}".format(day, hour), "%Y-%m-%d %H:%M")
+                    sub_path_list.append((fname, int(time.mktime(ftime))))
+            return sub_path_list
+
+        elif isinstance(path, (list, tuple, set, dict)):
+            path_res = list()
+            for p in path:
+                path_res.append(self.list_path(p, pattern, hadoop_env))
+            return path_res
+
+        else:
+            raise ValueError("format of {0} does not supported".format(path))
+
+    def list_path_size(self, path, hadoop_env=None):
+        """List size of paths.
+
+        Parameters
+        ----------
+        path: string/list/tuple/set/dict
+            The path to be listed.
+
+        hadoop_env: string, optional
+            Hadoop environment's alias name.
+
+        Returns
+        -------
+        generator: generator
+            A generator, which generate all path size list.
+            Format as follows:
+                [(sub1_path1, size1), (sub1_path2, size2), ...]
+
+        """
+        hadoop_env = self.__using_hadoop_env(hadoop_env)
+        path_list = list()
+        if isinstance(path, basestring):
+            path_list = map(str.strip, path.split(','))
+        elif isinstance(path, (list, tuple, set, dict)):
+            path_list = map(str.strip, path)
+        else:
+            raise ValueError("format of {0} does not supported".format(path))
+
+        hadoop_env_path = self.__hadoop_env[hadoop_env]['path']
+        cmd = ["{0}/bin/hadoop".format(hadoop_env_path), "fs", "-dus"]
+        cmd.extend(path_list)
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        while proc.poll() is None:
+            for line in iter(proc.stdout.readline, b''):
+                fields = line.strip().split('\t')
+                if len(fields) != 2:
+                    continue
+                (path_name, size) = fields
+                fname = path_name.split('//', 1)[1]
+                fname = fname[fname.index('/'):]
+                yield (fname, int(size))
+        if proc.returncode != 0:
+            raise ValueError("access [{0}] failed, info [{1}]".format(path, proc.stderr.read()))
+
+    def remove(self, hadoop_path, hadoop_env=None):
+        """Remove a path.
+
+        Parameters
+        ----------
+        hadoop_path: string
+            The path to be removed.
+
+        hadoop_env: string, optional
+            Alias name of hadoop environment.
+
+        Returns
+        -------
+        result: integer 
+            0 if the path been removed successfully, otherwise non zero.
+
+        """
+        hadoop_env = self.__using_hadoop_env(hadoop_env)
+        return subprocess.Popen(["{0}/bin/hadoop".format(self.__hadoop_env[hadoop_env]['path']),
+                                            "fs", "-rmr", hadoop_path],
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE).wait()
+
+    def mkdir(self, hadoop_path, hadoop_env=None):
+        """Create a path.
+
+        Parameters
+        ----------
+        hadoop_path: string
+            The path to be created.
+
+        hadoop_env: string, optional
+            Alias name of hadoop environment.
+
+        Returns
+        -------
+        result: integer 
+            0 if the path been created successfully, otherwise non zero.
+
+        """
+        hadoop_env = self.__using_hadoop_env(hadoop_env)
+        return subprocess.Popen(["{0}/bin/hadoop".format(self.__hadoop_env[hadoop_env]['path']),
+                                            "fs", "-mkdir", hadoop_path],
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE).wait()
+
+    def rename(self, src_path, dest_path, hadoop_env=None):
+        """rename/move a source path to in destionaion path.
+
+        Parameters
+        ----------
+        src_path: string
+            Source path.
+
+        dest_path: string
+            Destination path.
+
+        hadoop_env: string, optional
+            Alias name of hadoop environment.
+
+        Returns
+        -------
+        result: integer 
+            0 if the path been rename/move successfully, otherwise non zero.
+
+        """
+        hadoop_env = self.__using_hadoop_env(hadoop_env)
+        return subprocess.Popen(["{0}/bin/hadoop".format(self.__hadoop_env[hadoop_env]['path']),
+                                            "fs", "-mv", src_path, dest_path],
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE).wait()
 
     def download(self, hadoop_path, local_path, clear_output=False, hadoop_env=None):
         """Download hadoop data to local path.
