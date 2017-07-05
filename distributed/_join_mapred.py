@@ -1,6 +1,6 @@
 """Internal joining tools.
 """
-# Author: Donald Cheung <jianzhang9102@gmail.com>
+# Author: Donald Cheung
 import sys
 import re
 import os

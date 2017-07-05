@@ -383,7 +383,7 @@ class Hadoop(object):
         hadoop_env = self.__find_hadoop_env(cmd.split(' streaming ', 1)[0].strip())
         if clear_output:
             output_path = cmd.split(" -output ")[-1].strip().split(' ', 1)[0]
-            self.remove_path(output_path, hadoop_env)
+            self.remove(output_path, hadoop_env)
 
         process = runner.TaskRunner(cmd, shell=True, stdout=subprocess.PIPE,
                                                      stderr=subprocess.PIPE,
@@ -414,7 +414,7 @@ class Hadoop(object):
         signal.signal(signal.SIGTERM, pre_sigterm_handler)
         return process.returncode
 
-    def remove_path(self, hadoop_path, hadoop_env=None):
+    def remove(self, hadoop_path, hadoop_env=None):
         """Remove a path.
 
         Parameters
@@ -434,6 +434,29 @@ class Hadoop(object):
         hadoop_env = self.__using_hadoop_env(hadoop_env)
         return subprocess.Popen(["{0}/bin/hadoop".format(self.__hadoop_env[hadoop_env]['path']),
                                             "fs", "-rmr", hadoop_path],
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE).wait()
+
+    def mkdir(self, hadoop_path, hadoop_env=None):
+        """Create a path.
+
+        Parameters
+        ----------
+        hadoop_path: string
+            The path to be created.
+
+        hadoop_env: string, optional
+            Alias name of hadoop environment.
+
+        Returns
+        -------
+        result: integer 
+            0 if the path been created successfully, otherwise non zero.
+
+        """
+        hadoop_env = self.__using_hadoop_env(hadoop_env)
+        return subprocess.Popen(["{0}/bin/hadoop".format(self.__hadoop_env[hadoop_env]['path']),
+                                            "fs", "-mkdir", hadoop_path],
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE).wait()
 
@@ -628,7 +651,7 @@ class Hadoop(object):
             hadoop_env = dest_hadoop_env
 
         if clear_output:
-            self.remove_path(dest_path, dest_hadoop_env)
+            self.remove(dest_path, dest_hadoop_env)
 
         distcp_conf = dict()
         distcp_conf['hadoop_env'] = self.__hadoop_env[hadoop_env]['path']
@@ -912,7 +935,7 @@ class Hadoop(object):
         """
         hadoop_env = self.__using_hadoop_env(hadoop_env)
         if clear_output is True:
-            self.remove_path(hadoop_path, hadoop_env=hadoop_env)
+            self.remove(hadoop_path, hadoop_env=hadoop_env)
 
         if verbose is True:
             proc_stderr = None
