@@ -26,9 +26,9 @@ class Hadoop(object):
         ----------
         hadoop_env_list: list/tuple/set/dict, optional
             List of hadoop environment. Element should be length 2 if in type list/tuple/set.
-            For example, 
+            For example,
                 [
-                    ("cluster1", "/local/environment/path/of/cluster1"), 
+                    ("cluster1", "/local/environment/path/of/cluster1"),
                     ("cluster2", "/local/environment/path/of/cluster2"),
                     ....
                     ("clusterk", "/local/environment/path/of/clusterk")
@@ -108,7 +108,7 @@ class Hadoop(object):
             Root path of local hadoop environment, subdirectory must contains `conf' and `bin'
             directory.
 
-        update: boolean, optional 
+        update: boolean, optional
             If `name' is already exists, setting `update' to be True will replace old environment.
 
         """
@@ -162,7 +162,7 @@ class Hadoop(object):
         if name is not None:
             return self.__hadoop_env.get(name, None)
 
-        hadoop_env_list = list() 
+        hadoop_env_list = list()
         for name in self.__env_name_list:
             hadoop_env_list.append((name, self.__hadoop_env[name]))
         return hadoop_env_list
@@ -228,7 +228,7 @@ class Hadoop(object):
             Streaming job's reduce capacity, default value is 743.
 
         memory_limit: integer, optional
-            Streaming job's memory limit in MB, default value is 1200. 
+            Streaming job's memory limit in MB, default value is 1200.
 
         map_output_key_sep: string, optional
             Streaming job's map output key's separator, default value is '\t'.
@@ -515,7 +515,7 @@ class Hadoop(object):
 
         verbose: boolean, optional
             Output streaming job's log if set True.
-            
+
         Returns
         -------
         returncode: integer
@@ -706,7 +706,7 @@ class Hadoop(object):
         -------
         generator: generator
             A generator, which generate content result.
-        
+
         """
         hadoop_env = self.__using_hadoop_env(hadoop_env)
         proc = subprocess.Popen(["{0}/bin/hadoop".format(self.__hadoop_env[hadoop_env]['path']),
@@ -841,7 +841,7 @@ class Hadoop(object):
 
         Returns
         -------
-        result: integer 
+        result: integer
             0 if the path been removed successfully, otherwise non zero.
 
         """
@@ -864,13 +864,71 @@ class Hadoop(object):
 
         Returns
         -------
-        result: integer 
+        result: integer
             0 if the path been created successfully, otherwise non zero.
 
         """
         hadoop_env = self.__using_hadoop_env(hadoop_env)
         return subprocess.Popen(["{0}/bin/hadoop".format(self.__hadoop_env[hadoop_env]['path']),
                                             "fs", "-mkdir", hadoop_path],
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE).wait()
+
+    def touchz(self, hadoop_path, hadoop_env=None):
+        """Create a file of zero length.
+
+        Parameters
+        ----------
+        hadoop_path: string
+            The file path to be created.
+
+        hadoop_env: string, optional
+            Alias name of hadoop environment.
+
+        Returns
+        -------
+        result: integer
+            return 0 if succeed.
+            non-zero is returned if the file exists with non-zero length.
+
+        """
+        hadoop_env = self.__using_hadoop_env(hadoop_env)
+        return subprocess.Popen(["{0}/bin/hadoop".format(self.__hadoop_env[hadoop_env]['path']),
+                                            "fs", "-touchz", hadoop_path],
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE).wait()
+
+    def test(self, hadoop_path, option='e', hadoop_env=None):
+        """Usage: hadoop fs -test -[defsz] URI
+
+        Parameters
+        ----------
+        hadoop_path: string
+            The file path to be created.
+
+        option: string, optional
+            Set testing flag, valid `option' value must be as follows:
+                e: if the path exists, return 0.
+                d: if the path is a directory, return 0.
+                z: if the file is zero length, return 0.
+
+        hadoop_env: string, optional
+            Alias name of hadoop environment.
+
+        Returns
+        -------
+        result: integer
+            return test result.
+
+        """
+        valid_options = ('e', 'd', 'z')
+        if option not in valid_options:
+            raise ValueError("Unsupported option [%s], should be one of [%s]" % (\
+                                option, "".join(valid_options)))
+
+        hadoop_env = self.__using_hadoop_env(hadoop_env)
+        return subprocess.Popen(["{0}/bin/hadoop".format(self.__hadoop_env[hadoop_env]['path']),
+                                            "fs", "-test", '-%s' % (option), hadoop_path],
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE).wait()
 
@@ -890,7 +948,7 @@ class Hadoop(object):
 
         Returns
         -------
-        result: integer 
+        result: integer
             0 if the path been rename/move successfully, otherwise non zero.
 
         """
@@ -979,3 +1037,4 @@ class Hadoop(object):
                                 ],
                                 stdout=proc_stdout,
                                 stderr=proc_stderr).wait()
+
