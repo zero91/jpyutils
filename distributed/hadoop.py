@@ -14,6 +14,9 @@ import time
 import re
 import copy
 import shutil
+import json
+import copy
+import tempfile
 import xml.etree.ElementTree as ET
 
 class Hadoop(object):
@@ -899,7 +902,7 @@ class Hadoop(object):
                                 stderr=subprocess.PIPE).wait()
 
     def test(self, hadoop_path, option='e', hadoop_env=None):
-        """Usage: hadoop fs -test -[defsz] URI
+        """Test a path property.
 
         Parameters
         ----------
@@ -931,6 +934,50 @@ class Hadoop(object):
                                             "fs", "-test", '-%s' % (option), hadoop_path],
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE).wait()
+
+    def stat(self, hadoop_path, fmt="%Y", hadoop_env=None):
+        """Get stat info of a path.
+
+        Parameters
+        ----------
+        hadoop_path: string
+            The file path to be created.
+
+        fmt: string, optional
+            stat result format, supported following format:
+                %b: return file size (0 for directory)
+                %n: return file name
+                %o: return block size
+                %r: return file bakeups
+                %y: return UTC time in format yyyy-MM-dd HH:mm:ss
+                %Y: return UTC unix time stamp in microseconds
+                %F: return "directory" for a directory, return "regular file" for a file
+
+        hadoop_env: string, optional
+            Alias name of hadoop environment.
+
+        Returns
+        -------
+        result: string or list
+            If `fmt' is a list/tuple, return a list corresponds to `fmt',
+            otherwise return a string.
+
+        """
+        hadoop_env = self.__using_hadoop_env(hadoop_env)
+        if isinstance(fmt, basestring):
+            fmt_str = fmt
+        elif isinstance(fmt, (list, tuple)):
+            fmt_str = "".join(fmt)
+        else:
+            raise ValueError("Type of `fmt' shoule be basestring/list/tuple")
+
+        hadoop_bin_path = "{0}/bin/hadoop".format(self.__hadoop_env[hadoop_env]['path'])
+        result = subprocess.check_output([hadoop_bin_path, "fs", "-stat", fmt_str, hadoop_path])
+
+        if fmt is None or isinstance(fmt, basestring):
+            return result.strip()
+        else:
+            return result.strip().split('')
 
     def rename(self, src_path, dest_path, hadoop_env=None):
         """rename/move a source path to in destionaion path.
@@ -1037,4 +1084,105 @@ class Hadoop(object):
                                 ],
                                 stdout=proc_stdout,
                                 stderr=proc_stderr).wait()
+
+
+class HadoopDataMonitor(Hadoop):
+    """Tools for monitoring a data path, which need to be updated periodicly.
+    """
+    def __init__(self, data_path, input_json_file, hadoop_env_list=None):
+        """Constructor.
+
+        Parameters
+        ----------
+        data_path: string
+            Target monitoring data path.
+
+        input_json_file: string
+            Input path list of target monitoring data. Listed as lines of json string.
+
+        hadoop_env_list: list/tuple/set/dict, optional
+            Same meaning as parent class `Hadoop' constructor.
+
+        """
+        super(HadoopDataMonitor, self).__init__()
+        self.__data_path = data_path
+        self.__input_json_file = input_json_file
+
+        if self.test(self.__data_path) != 0 or self.test(self.__data_path, 'd') == 0:
+            # for a directory
+            self.__done_file = "%s/DONE" % (self.__data_path)
+            self.__lock_file = "%s/LOCK" % (self.__data_path)
+        else:
+            self.__done_file = "%s.DONE" % (self.__data_path)
+            self.__lock_file = "%s.LOCK" % (self.__data_path)
+
+        self.__double_lock_file = "%s.double_lock" % (self.__lock_file)
+        self.__is_running = False
+        self.__update_status = True
+
+    def __del__(self):
+        if self.__is_running is True:
+            self.remove(self.__lock_file)
+            self.remove(self.__double_lock_file)
+            if self.__update_status is True:
+                self.touchz(self.__done_file)
+
+    def set_update_status(self, status):
+        """Set exit status of update job.
+
+        Parameters
+        ----------
+        status: boolean
+            exit status of updating job.
+
+        """
+        self.__update_status = status
+
+    def need_update(self, expired=3600 * 24 * 7 * 1000):
+        """Test whether target monitoring data should be updated.
+
+        Parameters
+        ----------
+        expired: integer, optional
+            Expired microseconds of updated job. This is mostly used for 
+            the sitution when monitoring or updating job failed unexpectedly.
+
+        Returns
+        -------
+        needed: boolean
+            True if the data need to be updated, otherwise False.
+
+        """
+        if self.__is_running is True:
+            return False
+
+        local_lock_file = os.path.join(tempfile.gettempdir(), "LOCK")
+        open(local_lock_file, 'w').close()
+
+        # check whether there is a process running and is not expired yet.
+        if self.upload(local_lock_file, self.__lock_file, verbose=False) != 0:
+            if int(time.time() * 1000) - int(self.stat(self.__lock_file, '%Y')) < expired:
+                return False
+            else:
+                if self.upload(local_lock_file, self.__double_lock_file, verbose=False) != 0:
+                    return False
+                else:
+                    self.touchz(self.__lock_file)
+
+        if self.test(self.__done_file) == 0:
+            last_done_timestamp = int(self.stat(self.__done_file, '%Y'))
+            for line in self.fetch_content(self.__input_json_file):
+                try:
+                    path_info = json.loads(line)
+                    if path_info['timestamp'] >= last_done_timestamp:
+                        self.__is_running = True
+                        self.remove(self.__done_file)
+                        return True
+                except Exception as e:
+                    continue
+            self.remove(self.__lock_file)
+            return False
+
+        self.__is_running = True
+        return True
 
