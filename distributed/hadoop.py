@@ -1156,6 +1156,9 @@ class HadoopDataMonitor(Hadoop):
         if self.__is_running is True:
             return False
 
+        if self.test(self.__input_json_file) != 0 or self.test(self.__input_json_file, 'd') == 0:
+            return False
+
         local_lock_file = os.path.join(tempfile.gettempdir(), "LOCK")
         open(local_lock_file, 'w').close()
 
