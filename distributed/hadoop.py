@@ -61,8 +61,8 @@ class Hadoop(object):
             'job_name':           'streamingjob',
             'map_task_num':       743,
             'reduce_task_num':    743,
-            'map_capacity':       743,
-            'reduce_capacity':    743,
+            'map_capacity':       1500,
+            'reduce_capacity':    1500,
             'memory_limit':       1200,
             'map_output_key_sep': '\t',
             'map_sorted_key_num': 1,
@@ -1138,13 +1138,13 @@ class HadoopDataMonitor(Hadoop):
         """
         self.__update_status = status
 
-    def need_update(self, expired=3600 * 24 * 7 * 1000):
+    def need_update(self, expired=3600 * 24 * 7):
         """Test whether target monitoring data should be updated.
 
         Parameters
         ----------
         expired: integer, optional
-            Expired microseconds of updated job. This is mostly used for 
+            Expired seconds of updated job. This is mostly used for
             the sitution when monitoring or updating job failed unexpectedly.
 
         Returns
@@ -1164,7 +1164,7 @@ class HadoopDataMonitor(Hadoop):
 
         # check whether there is a process running and is not expired yet.
         if self.upload(local_lock_file, self.__lock_file, verbose=False) != 0:
-            if int(time.time() * 1000) - int(self.stat(self.__lock_file, '%Y')) < expired:
+            if int(time.time()) - int(self.stat(self.__lock_file, '%Y')) / 1000 < expired:
                 return False
             else:
                 if self.upload(local_lock_file, self.__double_lock_file, verbose=False) != 0:
@@ -1173,7 +1173,7 @@ class HadoopDataMonitor(Hadoop):
                     self.touchz(self.__lock_file)
 
         if self.test(self.__done_file) == 0:
-            last_done_timestamp = int(self.stat(self.__done_file, '%Y'))
+            last_done_timestamp = int(self.stat(self.__done_file, '%Y')) / 1000
             for line in self.fetch_content(self.__input_json_file):
                 try:
                     path_info = json.loads(line)
