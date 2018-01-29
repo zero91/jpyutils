@@ -69,9 +69,10 @@ class MultiTaskRunner(object):
             The name of the task. Best using naming method of programming languages,
             for it may be used to create log files on disk.
 
-        depends: string
-            A string which is the concatenation of the names of all the tasks which must be
-            executed ahead of this task. Separated by a single comma(',').
+        depends: string/list/set/dict/collections.defaultdict
+            List of depended jobs' name.
+            If this is a string which is the concatenation of the names of all the tasks which
+            must be executed ahead of this task. Separated by a single comma(',').
 
         append_log: boolean
             Append to log file if set True, otherwise clear old content.
