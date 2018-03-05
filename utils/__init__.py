@@ -10,10 +10,13 @@ from . import data_proxy
 from . import random
 from .deprecation import deprecated
 from .module_builder import ModuleBuilder
+from .simple_conf import SimpleConf
 
 __all__ = ['check',
            'shell',
            'chinese',
            'data_proxy',
            'ModuleBuilder',
-           'random']
+           'random',
+           'SimpleConf',
+           ]
