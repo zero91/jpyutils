@@ -1,22 +1,16 @@
 """
-Useful utilities for daily use.
+Collections of small functions.
 ===============================
 """
 
+from . import random
+
+"""
 from . import check
 from . import shell
 from . import chinese
 from . import data_proxy
-from . import random
 from .deprecation import deprecated
 from .module_builder import ModuleBuilder
 from .simple_conf import SimpleConf
-
-__all__ = ['check',
-           'shell',
-           'chinese',
-           'data_proxy',
-           'ModuleBuilder',
-           'random',
-           'SimpleConf',
-           ]
+"""
