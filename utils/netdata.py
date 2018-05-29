@@ -5,7 +5,7 @@ import os
 import requests
 import logging
 
-def download(url, save_fname, chunk_size=1024 * 1024 * 16):
+def download(url, save_fname, overwrite=False, chunk_size=1024 * 1024 * 16):
     """Download a file from remote site.
 
     Parameters
@@ -15,6 +15,9 @@ def download(url, save_fname, chunk_size=1024 * 1024 * 16):
 
     save_fname: str
         Local file name to save the data.
+
+    overwrite: boolean
+        Whether or not overwrite the file if it already exists.
 
     chunk_size: integer
         The number of bytes it should read into memory.
@@ -28,6 +31,10 @@ def download(url, save_fname, chunk_size=1024 * 1024 * 16):
         The headers returned from the remote server.
 
     """
+    if os.path.exists(save_fname) and not overwrite:
+        logging.info("Target file %s already exists")
+        return True, None
+
     logger = logging.getLogger()
     r = requests.get(url, stream=True)
     if r.status_code != requests.codes.ok:
