@@ -5,14 +5,14 @@ import logging
 import os
 import datetime
 
-def get_logger(name, level=logging.INFO, save_to_disk=False, path="."):
+def get_logger(name=None, level=logging.INFO, save_to_disk=False, path="."):
     """Initialize a logger.
-     Return a logger with the specified name, creating it if necessary.
+    Return a logger with the specified name, creating it if necessary.
 
     Parameters
     ----------
     name: str
-        Logger's name.
+        Logger's name. If no name is specified, use the root logger.
 
     level: enumerator
         The level of the Logger(DEBUG INFO WARNING ERROR CRITICAL).
@@ -44,12 +44,12 @@ def get_logger(name, level=logging.INFO, save_to_disk=False, path="."):
             raise IOError('%s is existed and is a file' % (path))
 
         time_stamp = datetime.datetime.now().strftime("%Y%m%d")
-        info_fname = os.path.join(path, '{name}_{time}.log'.format(name=name, time=time_stamp))
+        info_fname = os.path.join(path, '{name}_{time}.log'.format(name=logger.name, time=time_stamp))
         info_handler = logging.FileHandler(info_fname)
         info_handler.setFormatter(formatter)
         logger.addHandler(info_handler)
 
-        err_fname = os.path.join(path, '{name}_{time}.log.err'.format(name=name, time=time_stamp))
+        err_fname = os.path.join(path, '{name}_{time}.log.err'.format(name=logger.name, time=time_stamp))
         err_handler = logging.FileHandler(err_fname)
         err_handler.setFormatter(formatter)
         err_handler.setLevel(logging.ERROR)
