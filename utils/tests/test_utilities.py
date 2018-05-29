@@ -14,7 +14,8 @@ class TestUtilities(unittest.TestCase):
         self.__random_dir = utils.random.random_str(32)
 
     def test_get_logger(self):
-        logger = utils.utilities.get_logger(__name__, save_to_disk=True, path=self.__random_dir, level=logging.DEBUG)
+        logger = utils.utilities.get_logger(__name__, save_to_disk=True,
+                                            path=self.__random_dir, level=logging.DEBUG)
 
         logger.debug('this is a logger debug message')
         logger.info('this is a logger info message')
