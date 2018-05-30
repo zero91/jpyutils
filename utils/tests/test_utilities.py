@@ -27,6 +27,13 @@ class TestUtilities(unittest.TestCase):
         self.assertFalse(os.path.isfile(self.__random_dir))
         shutil.rmtree(self.__random_dir)
 
+    def test_read_zip(self):
+        url = "https://github.com/srendle/libfm/archive/master.zip"
+        utils.netdata.download(url, self.__random_dir)
+        self.assertGreater(len(utils.utilities.read_zip(self.__random_dir, merge=False)), 5)
+        self.assertGreater(len(utils.utilities.read_zip(self.__random_dir, merge=True)), 10000)
+        os.remove(self.__random_dir)
+
     def tearDown(self):
         pass
 

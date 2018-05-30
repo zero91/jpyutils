@@ -31,9 +31,8 @@ def download(url, save_fname, overwrite=False, chunk_size=1024 * 1024 * 16):
         The headers returned from the remote server.
 
     """
-    logger = logging.getLogger()
     if os.path.exists(save_fname) and not overwrite:
-        logger.info("Target file %s already exists" % save_fname)
+        logging.info("Target file %s already exists" % save_fname)
         return True, None
 
     r = requests.get(url, stream=True)
@@ -48,12 +47,12 @@ def download(url, save_fname, overwrite=False, chunk_size=1024 * 1024 * 16):
         raise IOError('%s is existed and is a file' % (save_dir))
 
     size = 0
-    logger.info("Request %s, download %.2fMB" % (url, 0))
+    logging.info("Request %s, download %.2fMB" % (url, 0))
     with open(save_fname, 'wb') as fout:
         for chunk in r.iter_content(chunk_size=chunk_size):
             if chunk: # filter out keep-alive new chunks
                 fout.write(chunk)
                 fout.flush()
                 size += len(chunk)
-                logger.info("Request %s, download %.2fMB" % (url, size / 1024. ** 2))
+                logging.info("Request %s, download %.2fMB" % (url, size / 1024. ** 2))
     return True, r.headers
