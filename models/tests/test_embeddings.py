@@ -21,6 +21,10 @@ class TestEmbeddings(unittest.TestCase):
         self.assertEqual(word_embeddings.shape[0], len(word2id))
         self.assertEqual(word_embeddings.shape[1], 50)
 
+        word2id, word_embeddings = self.__embeddings.load("glove.6B", 50, id_shift=3)
+        self.assertEqual(word_embeddings.shape[0], len(word2id) + 3)
+        self.assertEqual(word_embeddings.shape[1], 50)
+
     def test_generate(self):
         random_embeddings = self.__embeddings.generate((3, 50))
         self.assertEqual(random_embeddings.shape, (3, 50))

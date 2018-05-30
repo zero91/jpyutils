@@ -59,7 +59,9 @@ class Embeddings(object):
             Word candidates for which we need to extract word embeddings.
 
         id_shift: integer
-            Minimum word id.
+            Minimum word id for existing word.
+            'id_shift' randomized word vectors will be generated,
+            and will be appended in the front of the embeddings.
 
         resource_info: dict
             Word embeddings resource information.
@@ -108,6 +110,10 @@ class Embeddings(object):
                 logging.info("Read %.2fK lines" % (line_cnt / 1000.))
 
         word_embeddings = np.array(vectors, dtype=np.float32)
+        if id_shift > 0:
+            word_embeddings = np.append(self.generate((id_shift, dim), normalize=False),
+                                        word_embeddings, axis=0)
+
         if normalize:
             norms = np.linalg.norm(word_embeddings, axis=1).reshape((-1, 1))
             word_embeddings /= norms
