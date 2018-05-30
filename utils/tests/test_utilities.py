@@ -30,6 +30,9 @@ class TestUtilities(unittest.TestCase):
     def test_read_zip(self):
         url = "https://github.com/srendle/libfm/archive/master.zip"
         utils.netdata.download(url, self.__random_dir)
+        contents = utils.utilities.read_zip(self.__random_dir, filelist=".*.cpp", merge=False)
+        for key in contents:
+            self.assertEqual(key[-4:], ".cpp")
         self.assertGreater(len(utils.utilities.read_zip(self.__random_dir, merge=False)), 5)
         self.assertGreater(len(utils.utilities.read_zip(self.__random_dir, merge=True)), 10000)
         os.remove(self.__random_dir)

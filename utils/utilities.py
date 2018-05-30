@@ -6,6 +6,7 @@ import os
 import datetime
 import zipfile
 import operator
+import re
 
 def get_logger(name=None, level=logging.INFO, save_to_disk=False, path="."):
     """Initialize a logger.
@@ -89,26 +90,28 @@ def read_zip(zipfname, filelist=None, merge=False, encoding='utf-8', sep='\n'):
 
     Returns
     -------
-    contents: str/list of str
-        File contents of specified file list.
+    contents: str/dict
+        File contents of for the specified file list.
 
     """
     fzip = zipfile.ZipFile(zipfname)
     if filelist is None:
         filelist = fzip.namelist()
-    zip_fileset = set(fzip.namelist())
+    elif isinstance(filelist, str):
+        filelist = [filelist]
+    pattern_list = list(map(re.compile, filelist))
 
-    contents = list()
-    for fname in filelist:
-        logging.info("Extracting %s" % (fname))
-        if fname not in zip_fileset:
-            logging.warning("File %s not exist in zipfile %s" % (fname, zipfname))
+    contents = dict()
+    for fname in fzip.namelist():
+        if all(map(lambda p: p.match(fname) is None, pattern_list)):
             continue
-        contents.append((fname, fzip.read(fname).decode(encoding)))
+
+        logging.info("Extracting %s" % (fname))
+        contents[fname] = fzip.read(fname).decode(encoding)
         if merge is True and sep is not None \
-                and len(contents[-1][1]) > 0 and contents[-1][1][-1] != sep:
-            contents[-1][1] += sep
+                and len(contents[fname]) > 0 and contents[fname][-1] != sep:
+            contents[fname][-1] += sep
 
     if len(contents) <= 1 or merge is True:
-        return "".join(map(operator.itemgetter(1), contents))
+        return "".join(contents.values())
     return contents
