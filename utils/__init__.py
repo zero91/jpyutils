@@ -6,6 +6,7 @@ Collections of small functions.
 from . import random
 from . import utilities
 from . import netdata
+from . import text
 
 """
 from . import check

@@ -1,12 +1,3 @@
-"""Manage word embedding resources.
-
-Supported Embeddings Resources:
-1. Glove(https://nlp.stanford.edu/projects/glove/)
-   a. glove.42B.300d: Common Crawl (42B tokens, 1.9M vocab, uncased, 300d vectors, 1.75 GB download)
-   b. glove.840B.300d: Common Crawl (840B tokens, 2.2M vocab, cased, 300d vectors, 2.03 GB download)
-   c. glove.6B: Wikipedia 2014 + Gigaword 5
-                (6B tokens, 400K vocab, uncased, 50d, 100d, 200d, & 300d vectors, 822 MB download)
-"""
 import os
 import gzip
 import zipfile
@@ -15,6 +6,16 @@ import numpy as np
 from jpyutils import utils
 
 class Embeddings(object):
+    """Manage word embedding resources.
+
+    Supported Embeddings Resources:
+    1. Glove(https://nlp.stanford.edu/projects/glove/)
+       a. glove.42B.300d: Common Crawl (42B tokens, 1.9M vocab, uncased, 300d vectors, 1.75 GB download)
+       b. glove.840B.300d: Common Crawl (840B tokens, 2.2M vocab, cased, 300d vectors, 2.03 GB download)
+       c. glove.6B: Wikipedia 2014 + Gigaword 5
+                    (6B tokens, 400K vocab, uncased, 50d, 100d, 200d, & 300d vectors, 822 MB download)
+
+    """
     def __init__(self, local_path="~/workspace/data/resources"):
         """Manage word embedding resources.
 
