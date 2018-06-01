@@ -16,16 +16,16 @@ class Embeddings(object):
                     (6B tokens, 400K vocab, uncased, 50d, 100d, 200d, & 300d vectors, 822 MB download)
 
     """
-    def __init__(self, local_path="~/workspace/data/resources"):
+    def __init__(self, local_dir="~/workspace/data/resources"):
         """Manage word embedding resources.
 
         Parameters
         ----------
-        local_path: str
+        local_dir: str
             Local path for saving resources.
 
         """
-        self.__local_path = os.path.realpath(os.path.expanduser(local_path))
+        self.__local_dir = os.path.realpath(os.path.expanduser(local_dir))
         self.__resources_info = {
             "glove.42B.300d": {
                 "url": "http://nlp.stanford.edu/data/glove.42B.300d.zip",
@@ -88,7 +88,7 @@ class Embeddings(object):
             else:
                 resource_info = self.__resources_info[resource_name]
 
-        local_zip = "%s/%s" % (self.__local_path, resource_name)
+        local_zip = "%s/%s" % (self.__local_dir, resource_name)
         utils.netdata.download(resource_info['url'], local_zip)
         contents = utils.utilities.read_zip(local_zip, filelist=resource_info[dim], merge=True)
 
