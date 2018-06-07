@@ -315,8 +315,15 @@ class DecomposableNLIModel(abc.ABC):
         -------
         model: DecomposableNLIModel
             DecomposableNLIModel instance.
+
+        Raises
+        ------
+        IOError: If 'model_dir' does not exist.
  
         """
+        if not os.path.exists(model_dir):
+            raise IOError("model dir [%s] does not exists" % (model_dir))
+
         with open("%s/config.yaml" % (model_dir)) as f:
             config = yaml.safe_load(f)
         m = cls(config)

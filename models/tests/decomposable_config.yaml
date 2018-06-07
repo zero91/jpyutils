@@ -1,0 +1,12 @@
+data: {embedding_size: 50, num_classes: 3, vocab_size: 2423}
+parameters:
+  aggregate:
+    dim: [100, 100]
+  attention:
+    dim: [100, 100]
+  compare:
+    dim: [100, 100]
+  projection: {dim: 100, enabled: true}
+train: {algorithm: adam, batch_size: 32, clip_norm_value: 100.0, dropout_rate: 0.8,
+  l2_coef: 0.0, learning_rate: 0.001, max_to_keep: 5, num_epoches: 10, report_interval: 100,
+  save_dir: ./saved_model}
