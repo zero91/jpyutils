@@ -2,6 +2,7 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import absolute_import
 import unittest
+import tensorflow as tf
 from jpyutils import utils
 
 class TestRandom(unittest.TestCase):
@@ -59,6 +60,32 @@ class TestRandom(unittest.TestCase):
         self.assertListEqual(array_6[1].tolist(), [0, 7, 5, 6, 1, 3, 3])
         self.assertEqual(sizes_6.shape, (2,))
         self.assertListEqual(sizes_6.tolist(), [4, 5])
+
+    def test_clip_sentence(self):
+        tf.InteractiveSession()
+        sentences = tf.constant([[0, 3, 2, 1, 1], [0, 4, 5, 2, 1]])
+
+        sizes_1 = tf.constant([1, 1])
+        clipped_sents1 = utils.text.clip_sentence(sentences, sizes_1)
+        self.assertListEqual(clipped_sents1.eval().tolist(), [[0], [0]])
+
+        sizes_2 = tf.constant([1, 2])
+        clipped_sents2 = utils.text.clip_sentence(sentences, sizes_2)
+        self.assertListEqual(clipped_sents2.eval().tolist(), [[0, 3], [0, 4]])
+
+        sizes_3 = tf.constant([4, 2])
+        clipped_sents3 = utils.text.clip_sentence(sentences, sizes_3)
+        self.assertListEqual(clipped_sents3.eval().tolist(), [[0, 3, 2, 1], [0, 4, 5, 2]])
+
+    def test_mask3d(self):
+        tf.InteractiveSession()
+        sentences = tf.constant([[[0, 3, 2], [0, 4, 5]], [[2, 1, 5], [3, 4, 5]]], dtype=tf.float32)
+        sentence_sizes = tf.constant([1, 2])
+
+        masked1 = utils.text.mask3d(sentences, sentence_sizes, 99).eval()
+        self.assertListEqual(tf.shape(sentences).eval().tolist(), tf.shape(masked1).eval().tolist())
+        self.assertEqual(masked1.tolist(), [[[0, 99, 99], [0, 99, 99]], [[2, 1, 99],[3, 4, 99]]])
+
 
     def tearDown(self):
         pass

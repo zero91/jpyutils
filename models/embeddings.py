@@ -1,3 +1,7 @@
+from __future__ import division
+from __future__ import print_function
+from __future__ import absolute_import
+
 import os
 import gzip
 import zipfile
@@ -10,10 +14,12 @@ class Embeddings(object):
 
     Supported Embeddings Resources:
     1. Glove(https://nlp.stanford.edu/projects/glove/)
-       a. glove.42B.300d: Common Crawl (42B tokens, 1.9M vocab, uncased, 300d vectors, 1.75 GB download)
-       b. glove.840B.300d: Common Crawl (840B tokens, 2.2M vocab, cased, 300d vectors, 2.03 GB download)
+       a. glove.42B.300d:
+          Common Crawl (42B tokens, 1.9M vocab, uncased, 300d vectors, 1.75 GB download)
+       b. glove.840B.300d:
+          Common Crawl (840B tokens, 2.2M vocab, cased, 300d vectors, 2.03 GB download)
        c. glove.6B: Wikipedia 2014 + Gigaword 5
-                    (6B tokens, 400K vocab, uncased, 50d, 100d, 200d, & 300d vectors, 822 MB download)
+            (6B tokens, 400K vocab, uncased, 50d, 100d, 200d, & 300d vectors, 822 MB download)
 
     """
     def __init__(self, local_dir="~/workspace/data/resources"):
@@ -89,8 +95,14 @@ class Embeddings(object):
                 resource_info = self.__resources_info[resource_name]
 
         local_zip = "%s/%s" % (self.__local_dir, resource_name)
-        utils.netdata.download(resource_info['url'], local_zip)
-        contents = utils.utilities.read_zip(local_zip, filelist=resource_info[dim], merge=True)
+        if 'url' in resource_info:
+            utils.netdata.download(resource_info['url'], local_zip)
+            contents = utils.utilities.read_zip(local_zip, filelist=resource_info[dim], merge=True)
+        elif 'local' in resource_info:
+            with open(resource_info['local'], 'r') as fin:
+                contents = fin.read()
+        else:
+            raise ValueError("The 'resource_info' you specified should at least has key 'url' or 'local'")
 
         word2id = dict()
         vocab_set = set(vocabulary) if vocabulary is not None else set()
@@ -99,8 +111,14 @@ class Embeddings(object):
             if len(line) == 0:
                 continue
             fields = line.rsplit(maxsplit=dim)
-            if len(fields) > 128:
-                logging.warning("word [%s] is longer than 128 and will be discarded" % (fields[0]))
+            if len(fields) != dim + 1:
+                logging.warning("dimension of line [%s] is not equal to %d (line_num: %d)" % (
+                        line, dim, line_cnt))
+                continue
+
+            if len(fields[0]) > 128:
+                logging.warning("word [%s] is longer than 128 and will be discarded " \
+                        "(line_num: %d)" % (fields[0], line_cnt))
                 continue
             if vocabulary is not None and fields[0] not in vocab_set:
                 continue
