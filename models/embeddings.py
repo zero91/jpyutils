@@ -123,6 +123,10 @@ class Embeddings(object):
             if vocabulary is not None and fields[0] not in vocab_set:
                 continue
 
+            if fields[0] in word2id:
+                logging.warning("vector of word [%s] already exists" % (fields[0]))
+                continue
+
             vectors.append(np.array(list(map(float, fields[1:])), dtype=np.float32))
             word2id[fields[0]] = len(word2id) + id_shift
             if line_cnt % 50000 == 0:
