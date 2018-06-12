@@ -36,7 +36,6 @@ def get_logger(name=None, level=logging.INFO, save_to_disk=False, path="."):
     """
     logger = logging.getLogger(name)
     logger.setLevel(level)
-
     formatter = logging.Formatter(
             "[%(asctime)s][%(filename)s:%(lineno)d][%(levelname)s]: %(message)s")
 
@@ -64,6 +63,13 @@ def get_logger(name=None, level=logging.INFO, save_to_disk=False, path="."):
         stream_handler = logging.StreamHandler()
         stream_handler.setFormatter(formatter)
         logger.addHandler(stream_handler)
+
+    handler_fname_set = set()
+    for handler in logger.handlers[:]:
+        if handler.stream.name in handler_fname_set:
+            logger.removeHandler(handler)
+            continue
+        handler_fname_set.add(handler.stream.name)
     return logger
 
 

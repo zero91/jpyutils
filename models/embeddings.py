@@ -120,6 +120,7 @@ class Embeddings(object):
                 logging.warning("word [%s] is longer than 128 and will be discarded " \
                         "(line_num: %d)" % (fields[0], line_cnt))
                 continue
+
             if vocabulary is not None and fields[0] not in vocab_set:
                 continue
 
