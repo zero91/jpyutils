@@ -19,7 +19,7 @@ class DecomposableNLIModelData(object):
         ([w1, w2, ..., wk], [t1, t2, ..., tk], label)
 
     """
-    def __init__(self, data, word2id):
+    def __init__(self, data, word2id, maxlen=None):
         """Create a new DecomposableNLIModelData object.
 
         Parameters
@@ -43,8 +43,8 @@ class DecomposableNLIModelData(object):
 
         sentences1 = list(map(operator.itemgetter(0), data))
         sentences2 = list(map(operator.itemgetter(1), data))
-        self._sentences1, self._sizes1 = utils.text.text2array(sentences1, word2id)
-        self._sentences2, self._sizes2 = utils.text.text2array(sentences2, word2id)
+        self._sentences1, self._sizes1 = utils.text.text2array(sentences1, word2id, maxlen=maxlen)
+        self._sentences2, self._sizes2 = utils.text.text2array(sentences2, word2id, maxlen=maxlen)
 
         if len(data[0]) == 3:
             label_set = set(map(operator.itemgetter(2), data))
@@ -464,7 +464,7 @@ class DecomposableNLIModel(abc.ABC):
         with tf.variable_scope('projection', reuse=reuse_weights):
             weights = tf.get_variable('weights',
                                       shape=[embedding_size, projection_dim],
-                                      initializer=tf.random_normal_initializer(0.0, 0.1))
+                                      initializer=tf.random_normal_initializer(0.0, 0.01))
             #TODO: use a more effective initializer
             projected = tf.matmul(embeddings_2d, weights)
 
