@@ -62,12 +62,32 @@ def download(url, save_fname, overwrite=False, chunk_size=1024 * 1024 * 16):
 
 
 def request(url, use_ssl=False, encoding='utf-8', retry=3, max_sleep_time=60):
-    """
-    Performs an http request, re-trying multiple times in case of error
-    :param uri: the URL to fetch
-    :param max_attempts: the maximum number of attempts before throwing an exception
-    :param logger: if passed, additional info will be logged in case of error
-    :return: the body of the request
+    """Fetch the content of a url.
+
+    Parameters
+    ----------
+    url: str
+        Url to fetch.
+
+    use_ssl: boolean
+        Whether request the url through a SSL conection or not.
+
+    encoding: str
+        Encoding of the url's content. It will first try to use the charset
+        specified by the http headers, if there is no specified charset,
+        use this parameter instead.
+
+    retry: integer
+        Maximum attempt number to request the target url.
+
+    max_sleep_time: integer
+        Maximum sleep time in seconds between each attempt.
+        It will use a random seconds between [0, max_sleep_time].
+
+    Returns
+    -------
+    contents: the body of the request
+
     """
     if use_ssl:
         ctx = ssl.create_default_context()
@@ -92,3 +112,4 @@ def request(url, use_ssl=False, encoding='utf-8', retry=3, max_sleep_time=60):
 
     logging.error("Error while requesting '%s'" % url)
     raise last_except
+
