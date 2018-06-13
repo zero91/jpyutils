@@ -8,4 +8,4 @@ from . import models
 from . import datasets
 from . import runner
 
-__all__ == ["utils", "models", "datasets", "runner"]
+__all__ = ["utils", "models", "datasets", "runner"]

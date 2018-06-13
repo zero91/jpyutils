@@ -3,7 +3,10 @@ from __future__ import print_function
 from __future__ import absolute_import
 import os
 import requests
+import urllib.request
 import logging
+import ssl
+import random
 
 def download(url, save_fname, overwrite=False, chunk_size=1024 * 1024 * 16):
     """Download a file from remote site.
@@ -56,3 +59,36 @@ def download(url, save_fname, overwrite=False, chunk_size=1024 * 1024 * 16):
                 size += len(chunk)
                 logging.info("Request %s, download %.2fMB" % (url, size / 1024. ** 2))
     return True, r.headers
+
+
+def request(url, use_ssl=False, encoding='utf-8', retry=3, max_sleep_time=60):
+    """
+    Performs an http request, re-trying multiple times in case of error
+    :param uri: the URL to fetch
+    :param max_attempts: the maximum number of attempts before throwing an exception
+    :param logger: if passed, additional info will be logged in case of error
+    :return: the body of the request
+    """
+    if use_ssl:
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+    else:
+        ctx = None
+
+    last_except = None
+    for i in range(retry):
+        try:
+            r = urllib.request.urlopen(url, context=ctx)
+            raw_data = r.read()
+            return str(raw_data, r.headers.get_content_charset(encoding))
+
+        except urllib.error.HTTPError as e:
+            last_except = e
+            sleep_time = random.randrange(0, max_sleep_time)
+            time.sleep(sleep_time)
+            logging.warning("Got HTTP Error %s. Sleeping %i seconds and trying again "\
+                            "for other %i times", e.code, sleep_time, retry - i - 1)
+
+    logging.error("Error while requesting '%s'" % url)
+    raise last_except
