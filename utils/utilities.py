@@ -7,6 +7,7 @@ import datetime
 import zipfile
 import operator
 import re
+import time
 
 def get_logger(name=None, level=logging.INFO, save_to_disk=False, path="."):
     """Initialize a logger.
@@ -121,3 +122,27 @@ def read_zip(zipfname, filelist=None, merge=False, encoding='utf-8', sep='\n'):
     if len(contents) <= 1 or merge is True:
         return "".join(contents.values())
     return contents
+
+
+def is_fresh_file(fname, days=1):
+    """Address the freshness of a file.
+
+    Parameters
+    ---------
+    fname: str
+        File's name.
+
+    days: float
+        Maximum days before current time. The argument may be a floating point number
+        for subday precision.
+
+    Returns
+    -------
+    is_fresh: boolean
+        True if the file is fresh, otherwise False.
+
+    """
+    if os.path.exists(fname) and (time.time() - os.path.getmtime(fname)) < days * 3600 * 24:
+        return True
+    return False
+

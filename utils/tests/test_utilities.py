@@ -37,6 +37,11 @@ class TestUtilities(unittest.TestCase):
         self.assertGreater(len(utils.utilities.read_zip(self.__random_dir, merge=True)), 10000)
         os.remove(self.__random_dir)
 
+    def test_is_fresh_file(self):
+        os.system("touch " + __file__)
+        self.assertTrue(utils.utilities.is_fresh_file(__file__))
+        self.assertFalse(utils.utilities.is_fresh_file(__file__, 0))
+
     def tearDown(self):
         pass
 

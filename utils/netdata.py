@@ -8,7 +8,7 @@ import logging
 import ssl
 import random
 
-def download(url, save_fname, overwrite=False, chunk_size=1024 * 1024 * 16):
+def download(url, save_fname, params=None, overwrite=False, chunk_size=1024 * 1024 * 16):
     """Download a file from remote site.
 
     Parameters
@@ -18,6 +18,9 @@ def download(url, save_fname, overwrite=False, chunk_size=1024 * 1024 * 16):
 
     save_fname: str
         Local file name to save the data.
+
+    params: bytes/dict (optional)
+        Dictionary or bytes to be sent in the query string for the :class:`Request`.
 
     overwrite: boolean
         Whether or not overwrite the file if it already exists.
@@ -30,17 +33,17 @@ def download(url, save_fname, overwrite=False, chunk_size=1024 * 1024 * 16):
     result: boolean
         Result of the download operation.
 
-    headers: dict
-        The headers returned from the remote server.
+    file_size: integer
+        The size of the downloaded file.
 
     """
     if os.path.exists(save_fname) and not overwrite:
         logging.info("Target file %s already exists" % save_fname)
-        return True, None
+        return True, os.path.getsize(save_fname)
 
-    r = requests.get(url, stream=True)
+    r = requests.get(url, params=params, stream=True)
     if r.status_code != requests.codes.ok:
-        return False, r.headers
+        return False, 0
 
     save_fname = os.path.realpath(save_fname)
     save_dir = os.path.dirname(save_fname)
@@ -58,7 +61,53 @@ def download(url, save_fname, overwrite=False, chunk_size=1024 * 1024 * 16):
                 fout.flush()
                 size += len(chunk)
                 logging.info("Request %s, download %.2fMB" % (url, size / 1024. ** 2))
-    return True, r.headers
+    return True, size
+
+
+def upload(url, files=None, data=None, params=None):
+    """Upload files to remote site.
+
+    Parameters
+    ----------
+    url: str
+        Url of remote server.
+
+    files: dict
+        Files which need to be uploaded, format:
+            {
+                "remote_field_name_1": local_fname_1,
+                "remote_field_name_2": local_fname_2,
+            }
+
+    data: dict/bytes (optional)
+        Dictionary (will be form-encoded), bytes, or file-like object to send
+        in the body of the :class:`Request`.
+
+    params: bytes/dict (optional)
+        Dictionary or bytes to be sent in the query string for the :class:`Request`.
+
+    Returns
+    -------
+    succeed: boolean
+        Result of the upload operation.
+
+    content: str
+        The returned content of remote server.
+
+    """
+    files_stream = dict()
+    if files is not None:
+        for field_name, fname in files.items():
+            files_stream[field_name] = open(fname, 'rb')
+
+    r = requests.post(url, data=data, files=files_stream, params=params)
+
+    for open_file in files_stream.values():
+        open_file.close()
+
+    if r.status_code != requests.codes.ok:
+        return False, r.content
+    return True, r.content
 
 
 def request(url, use_ssl=False, encoding='utf-8', retry=3, max_sleep_time=60):
