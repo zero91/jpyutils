@@ -7,8 +7,9 @@ from . import random
 from . import utilities
 from . import netdata
 from . import text
+from . import monitor
 
-__all__ = ["random", "utilities", "netdata", "text"]
+__all__ = ["random", "utilities", "netdata", "text", "monitor"]
 
 """
 from . import check
