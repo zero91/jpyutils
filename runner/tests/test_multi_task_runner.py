@@ -1,8 +1,10 @@
 import sys
 import unittest
 import subprocess
+import os
 
 from jpyutils import runner
+from jpyutils import utils
 
 class TestTaskDependencyManager(unittest.TestCase):
     def setUp(self):
@@ -78,41 +80,58 @@ class TestTaskDependencyManager(unittest.TestCase):
 
 class TestMultiTaskRunner(unittest.TestCase):
     def setUp(self):
-        pass
+        utils.utilities.get_logger()
 
     def tearDown(self):
         pass
 
-    def _test_add_job(self):
-        verbose = True
-        #log = None
-        #log = "log/"
-        #log = subprocess.PIPE
-        #print("hh")
+    def test_add(self):
+        # add
+        scheduler = runner.MultiTaskRunner()
+        scheduler.add(
+            command = "ls -l",
+            name = "test001",
+            stdout = subprocess.PIPE,
+            stderr = subprocess.PIPE,
+            shell=True
+        )
 
-        task = runner.MultiTaskRunner()
-        task.add("sleep 1; ls -l", name = "test001", shell=True)
-        task.add("sleep 2; ls -l /Users/zero91", name = "test002", depends="test001", shell=True)
-        task.run(verbose=verbose)
-        print("DONE")
+        scheduler.add(
+            command = "ls -l ~",
+            name = "test002",
+            depends="test001",
+            stdout = subprocess.PIPE,
+            stderr = subprocess.PIPE,
+            shell=True
+        )
+        self.assertEqual(scheduler.run(), 0)
+        self.assertGreater(len(scheduler.get_task_runner("test002").stdout.read()), 0)
 
-    def _test_add_jobs_from_file():
-        render_arguments = dict()
-        render_arguments["LOCAL_ROOT"] = "../"
-        render_arguments["HADOOP_BIN"] = "/home/zhangjian09/software/hadoop-client/hadoop/bin/hadoop"
-        render_arguments["DATE"] = "2015-03-10"
-        render_arguments["REF_DATE"] = "2015-03-18"
-        render_arguments["HDFS_JOINED_LOG_DIR"] = "/app/ecom/fcr-opt/kr/zhangjian09/2015/data/join_kr_log"
-        render_arguments["HDFS_ORIGIN_LOG_DIR"] = "/app/ecom/fcr-opt/kr/analytics"
+        # adds
+        scheduler = runner.MultiTaskRunner(render_arguments={"mark": "jpyutils", "num": "2018"})
 
-        run_all = runner.MultiTaskRunner(log, render_arguments, parallel_degree=4)
-        run_all.addf("conf/test.jobconf", "utf-8")
-        run_all.lists()
-        run_all.run(verbose=verbose)
+        scheduler.adds('TaskRunner(name = "ls_<%= num %>", command = "ls",)')
+        scheduler.adds(
+            'TaskRunner('
+            '    name = "ls_<%=mark%>",'
+            '    command = "ls",'
+            '    depends = "ls_<%=num%>",'
+            '    shell   = True,'
+            ')'
+        )
+        self.assertEqual(scheduler.run(), 0)
 
-        run_part = runner.MultiTaskRunner(log, render_arguments)
-        run_part.addf("conf/test.jobconf", "utf-8")
-        run_part.run("2,3,5-7,10-11", verbose=verbose)
+        # addf
+        scheduler = runner.MultiTaskRunner(render_arguments={"mark": "jpyutils", "num": "2018"})
+        conf_path = os.path.dirname(os.path.realpath(__file__))
+        scheduler.addf(os.path.join(conf_path, "multi_tasks.conf"))
+        self.assertEqual(scheduler.run(), 0)
+
+    def test_run(self):
+        conf_path = os.path.dirname(os.path.realpath(__file__))
+        scheduler = runner.MultiTaskRunner(render_arguments={"mark": "jpyutils", "num": "2018"})
+        scheduler.addf(os.path.join(conf_path, "multi_tasks.conf"))
+        self.assertEqual(scheduler.run("2,3,5-7,10-11"), 0)
 
 
 if __name__ == '__main__':

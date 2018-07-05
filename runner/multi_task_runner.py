@@ -6,26 +6,18 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import absolute_import
 
+from .common import TaskStatus
+from .task_runner import TaskRunner
+from . import progress_display
+
 import sys
 import time
 import signal
 import re
 import os
 import collections
-import enum
 import copy
-
-from .task_runner import TaskRunner
-
-class TaskStatus(enum.Enum):
-    DISABLED = 0
-    WAITING  = 1
-    READY    = 2
-    RUNNING  = 3
-    DONE     = 4
-    FAILED   = 5
-    KILLED   = 6
-
+import logging
 
 class TaskDependencyManager(object):
     """Manage a batch of tasks' topological relations.
@@ -269,15 +261,15 @@ class TaskDependencyManager(object):
 
 
 class MultiTaskRunner(object):
-    """A tasks manage class.
+    """Run multiple tasks.
 
     It maintains a set of tasks, and run the tasks according to their topological relations.
 
     Parameters
     ----------
-    log: string/None/subprocess.PIPE
-        The file/directory which used to save logs. Default to be None, the process's file
-        handles will be inherited from the parent. If log is a directory, log will be write
+    log_path: str/None/subprocess.PIPE
+        The directory which used to save logs. Default to be None, the process's file
+        handles will be inherited from the parent. Log will be write
         to filename specified by each task's name end up with "stdout"/"stderr".
 
     render_arguments: dict
@@ -289,6 +281,7 @@ class MultiTaskRunner(object):
 
     retry: integer
         Try executing each task retry times until succeed.
+
     """
     def __init__(self, log_path=None, render_arguments=None, parallel_degree=-1, retry=1):
         if log_path is not None:
@@ -316,15 +309,15 @@ class MultiTaskRunner(object):
 
         Parameters
         ----------
-        command: list/string
+        command: list/str
             The command which need to be executed.
             It has the same meaning as TaskRunner's command parameter.
 
-        name: string
+        name: str
             The name of the task. Best using naming method of programming languages,
             for it may be used to create log files on disk.
 
-        depends: string/list/set/dict/collections.defaultdict
+        depends: str/list/set/dict
             List of depended jobs' name.
             If this is a string which is the concatenation of the names of all the tasks which
             must be executed ahead of this task. Separated by a single comma(',').
@@ -339,6 +332,11 @@ class MultiTaskRunner(object):
         -------
         instance: MultiTaskRunner
             Reference for current instance.
+
+        Raises
+        ------
+        KeyError: If the task is already exists.
+
         """
         if name in self._m_task_runner_dict:
             raise KeyError("Task {0} is already exists!".format(name))
@@ -347,22 +345,18 @@ class MultiTaskRunner(object):
             if not os.path.exists(self._m_log_path):
                 os.makedirs(self._m_log_path)
 
-            for stream_name in ["stdout", "stderr"]:
-                if stream_name in popen_kwargs:
+            for sname in ["stdout", "stderr"]:
+                if sname in popen_kwargs:
                     continue
-                if append_log is True:
-                    popen_kwargs[stream_name] = open("%s/%s.%s" % (
-                                self._m_log_path, name, stream_name), 'a+')
-                else:
-                    popen_kwargs[stream_name] = open("%s/%s.%s" % (
-                                self._m_log_path, name, stream_name), 'w+')
+                popen_kwargs[sname] = open("%s/%s.%s" % (self._m_log_path, name, sname),
+                                           'a+' if append_log is True else 'w+')
 
         runner = TaskRunner(command, name=name, retry=self._m_retry, **popen_kwargs)
         self._m_task_runner_dict[runner.name] = [TaskStatus.WAITING, runner]
         self._m_dependency_manager.add_dependency(runner.name, depends)
         return self
 
-    def adds(self, tasks_str, encoding="utf-8"):
+    def adds(self, tasks_str):
         """Add tasks from a string.
 
         Parameters
@@ -370,22 +364,24 @@ class MultiTaskRunner(object):
         tasks_str: string
             The string of the tasks, which is a python executable code.
 
-        encoding: string
-            The encode of the argument `tasks_str'.
-
         Returns
         -------
         instance: MultiTaskRunner
             Reference for current instance.
+
+        Raises
+        ------
+        KeyError: Some of the arguments specified in `tasks_str' didn't provided.
+
         """
-        tasks_str = tasks_str.decode(encoding)
         render_arg_pattern = re.compile(r"\<\%=(.*?)\%\>")
         for match_str in re.findall(render_arg_pattern, tasks_str):
-            if match_str not in self.__render_arguments:
+            match_str = match_str.strip()
+            if match_str not in self._m_render_arguments:
                 raise KeyError("missing value for render argument {0}".format(match_str))
 
         def __lookup_func(reg_match):
-            return self.__render_arguments[reg_match.group(1).strip()]
+            return self._m_render_arguments[reg_match.group(1).strip()]
         tasks_str = render_arg_pattern.sub(__lookup_func, tasks_str)
 
         exec(tasks_str, {}, {'TaskRunner': self.add})
@@ -406,104 +402,123 @@ class MultiTaskRunner(object):
         -------
         instance: MultiTaskRunner
             Reference for current instance.
+
         """
-        return self.adds(open(tasks_fname, 'r').read(), encoding)
+        with open(tasks_fname, mode='r', encoding=encoding) as ftask:
+            return self.adds(ftask.read())
 
     def lists(self, displayer=None):
         """List all tasks.
 
         Parameters
         ----------
-        displayer: class
-            Class which can be used to display tasks.
+        displayer: class Instance
+            Class which can be used to display tasks status.
+
+        Raises
+        ------
+        ValueError: If the tasks' relation is not topological.
+
         """
-        if not self.__dependency_manager.is_topological():
+        if not self._m_dependency_manager.is_topological():
             raise ValueError("tasks's depenency relationships is not topological")
 
         if displayer is None:
-            TableProgressDisplay(self.__dependency_manager, self.__task_runner_dict).display()
+            progress_display.TableProgressDisplay(self._m_dependency_manager,
+                                                  self._m_task_runner_dict).display()
         else:
-            displayer(self.__dependency_manager, self.__task_runner_dict).display()
+            displayer(self._m_dependency_manager, self._m_task_runner_dict).display()
 
     def run(self, tasks=None, verbose=False, displayer=None):
-        """Running all jobs of this task.
+        """Run tasks.
 
         Parameters
         ----------
-        tasks : string
+        tasks : str
             The tasks which needed to be executed, sepecified by string seperated by one comma.
             Supported format is the same as method:
-                    `dependency_manager.TaskDependencyManager.parse_tasks'
+                    `TaskDependencyManager.parse_tasks'
+
+        verbose: boolean
+            Print verbose information.
+
+        displayer: class Instance
+            Class instance which can display tasks information in the managed way.
 
         Returns
         -------
         result : integer
             0 for success, otherwise nonzero.
 
+        Raises
+        ------
+        RuntimeError: If the tasks set is not a topological one or has been exected already.
+
         Notes
         -----
             Should only be executed once.
+
         """
         if self._m_started:
             raise RuntimeError("{0} should be executed only once".format(self.__class__.__name__))
 
-        print(self._m_dependency_manager.is_topological())
         if not self._m_dependency_manager.is_topological():
             raise RuntimeError("tasks' dependency relationships is not topological")
 
-        self.__started = True
+        self._m_started = True
 
         signal.signal(signal.SIGINT, self.__kill_signal_handler)
         signal.signal(signal.SIGTERM, self.__kill_signal_handler)
 
-        manager = self.__dependency_manager.parse_tasks(tasks)
-        tasks_info = manager.get_tasks_info()[1]
-        for task_name in self.__task_runner_dict:
+        tasks_info = self._m_dependency_manager.parse_tasks(tasks).get_tasks_info()[1]
+        for task_name in self._m_task_runner_dict:
             if task_name not in tasks_info:
-                self.__task_runner_dict[task_name][0] = TaskStatus.DISABLED
+                self._m_task_runner_dict[task_name][0] = TaskStatus.DISABLED
 
         if displayer is None:
-            displayer = TableProgressDisplay(self.__dependency_manager, self.__task_runner_dict)
+            displayer = progress_display.TableProgressDisplay(self._m_dependency_manager,
+                                                              self._m_task_runner_dict)
         else:
-            displayer = displayer(self.__dependency_manager, self.__task_runner_dict)
-        verbose and displayer.display()
+            displayer = displayer(self._m_dependency_manager, self._m_task_runner_dict)
 
         ready_list = list()
+        verbose and displayer.display()
         while True:
-            for task_name, (initial_id, running_id, depends, rdepends) in tasks_info.iteritems():
+            for task_name, (initial_id, running_id, depends, rdepends) in tasks_info.items():
                 if len(depends) == 0 and \
-                                    self.__task_runner_dict[task_name][0] == TaskStatus.WAITING:
+                            self._m_task_runner_dict[task_name][0] == TaskStatus.WAITING:
                     ready_list.append(task_name)
-                    self.__task_runner_dict[task_name][0] = TaskStatus.READY
+                    self._m_task_runner_dict[task_name][0] = TaskStatus.READY
 
             ready_list.sort(key=lambda task_name: tasks_info[task_name][1])
-            while len(self.__running_task_set) < self.__parallel_degree and len(ready_list) > 0:
+            while len(ready_list) > 0 and (self._m_parallel_degree < 0 or \
+                    len(self._m_running_task_set) < self._m_parallel_degree):
                 task_name = ready_list.pop(0)
-                self.__running_task_set.add(task_name)
-                self.__task_runner_dict[task_name][0] = TaskStatus.RUNNING
-                self.__task_runner_dict[task_name][1].start()
+                self._m_running_task_set.add(task_name)
+                self._m_task_runner_dict[task_name][0] = TaskStatus.RUNNING
+                self._m_task_runner_dict[task_name][1].start()
 
-            for task_name in self.__running_task_set.copy():
-                if self.__task_runner_dict[task_name][1].is_alive():
+            for task_name in self._m_running_task_set.copy():
+                if self._m_task_runner_dict[task_name][1].is_alive():
                     continue
-                self.__running_task_set.remove(task_name)
+                self._m_running_task_set.remove(task_name)
 
-                ret_code = self.__task_runner_dict[task_name][1].returncode
+                ret_code = self._m_task_runner_dict[task_name][1].returncode
                 if ret_code != 0:
-                    self.__task_runner_dict[task_name][0] = TaskStatus.FAILED
+                    self._m_task_runner_dict[task_name][0] = TaskStatus.FAILED
                     self.terminate()
                     displayer.display()
-                    sys.stderr.write("Task {0} failed, exit code {1}\n".format(task_name, ret_code))
+                    logging.critical("Task {0} failed, exit code {1}\n".format(task_name, ret_code))
                     return 1
                 else:
-                    self.__task_runner_dict[task_name][0] = TaskStatus.DONE
+                    self._m_task_runner_dict[task_name][0] = TaskStatus.DONE
 
                 for depend_task_name in tasks_info[task_name][3]:
                     tasks_info[depend_task_name][2].remove(task_name)
                 tasks_info.pop(task_name)
 
             verbose and displayer.display()
-            if len(tasks_info) == 0 and len(self.__running_task_set) == 0 and len(ready_list) == 0:
+            if len(tasks_info) == 0 and len(self._m_running_task_set) == 0 and len(ready_list) == 0:
                 break
             time.sleep(0.1)
 
@@ -512,23 +527,24 @@ class MultiTaskRunner(object):
 
     def __kill_signal_handler(self, signum, stack):
         self.terminate()
-        TableProgressDisplay(self.__dependency_manager, self.__task_runner_dict).display()
-        sys.stderr.write("\nReceive signal %d, all running processes are killed.\n" % signum)
+        progress_display.TableProgressDisplay(
+                self._m_dependency_manager, self._m_task_runner_dict).display()
+        logging.info("Receive signal %d, all running processes are killed.", signum)
         exit(1)
 
     def terminate(self):
         """Terminate all running process."""
-        for task_name in self.__running_task_set.copy():
-            self.__task_runner_dict[task_name][1].terminate()
-            self.__task_runner_dict[task_name][0] = TaskStatus.KILLED
-            self.__running_task_set.remove(task_name)
+        for task_name in self._m_running_task_set.copy():
+            self._m_task_runner_dict[task_name][1].terminate()
+            self._m_task_runner_dict[task_name][0] = TaskStatus.KILLED
+            self._m_running_task_set.remove(task_name)
 
     def get_task_runner(self, task_name):
-        """Get task runner reference of `task_name'
+        """Get running instance of `task_name'.
 
         Parameters
         ----------
-        task_name: string
+        task_name: str
             Target task's name.
 
         Returns
@@ -537,7 +553,7 @@ class MultiTaskRunner(object):
             Reference runner of `task_name'.
 
         """
-        if  task_name not in self.__task_runner_dict:
+        if task_name not in self._m_task_runner_dict:
             return None
-        return self.__task_runner_dict[task_name][1]
+        return self._m_task_runner_dict[task_name][1]
 
