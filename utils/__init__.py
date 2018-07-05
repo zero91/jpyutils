@@ -8,12 +8,12 @@ from . import utilities
 from . import netdata
 from . import text
 from . import monitor
+from . import terminal
 
-__all__ = ["random", "utilities", "netdata", "text", "monitor"]
+__all__ = ["random", "utilities", "netdata", "text", "monitor", "terminal"]
 
 """
 from . import check
-from . import shell
 from . import chinese
 from . import data_proxy
 from .deprecation import deprecated
