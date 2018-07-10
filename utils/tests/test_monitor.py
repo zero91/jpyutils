@@ -15,7 +15,7 @@ class TestMonitor(unittest.TestCase):
         pass
 
     def test_mail(self):
-        receivers = "jianzhang9102@apple.com"
+        receivers = "jianzhang9102@gmail.com"
         subject = "Test Email"
         content = 'This is a testing email. <br/><br/>' \
                   '<font size="5" color="red">Just ignore this email.</font>'
