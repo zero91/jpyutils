@@ -85,6 +85,7 @@ class TableProgressDisplay(object):
             if task_show_str != self._m_tasks_show[task_name]:
                 move = (len(self._m_tasks_info) - self._m_tasks_info[task_name][1]) * 2
                 fout.write("\033[%dA\33[K%s\033[%dB\n" % (move, task_show_str, move - 1))
+                self._m_tasks_show[task_name] = task_show_str
 
     def __fetch_task_str(self, task_name):
         task_status = self._m_task_runner_dict[task_name][0]
