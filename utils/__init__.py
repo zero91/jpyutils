@@ -10,7 +10,12 @@ from . import text
 from . import monitor
 from . import terminal
 
-__all__ = ["random", "utilities", "netdata", "text", "monitor", "terminal"]
+try:
+    from . import text
+    __all__ = ["random", "utilities", "netdata", "text", "monitor", "terminal"]
+
+except Exception as e:
+    __all__ = ["random", "utilities", "netdata", "monitor", "terminal"]
 
 """
 from . import check
