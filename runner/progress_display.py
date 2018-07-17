@@ -13,13 +13,13 @@ import sys
 import abc
 
 _TaskStatusColor = {
-    TaskStatus.DISABLED : ("Disabled", "white"),
-    TaskStatus.WAITING  : ("Waiting",  "yellow"),
-    TaskStatus.READY    : ("Ready",    "blue"),
-    TaskStatus.RUNNING  : ("Running",  "cyan"),
-    TaskStatus.DONE     : ("Done",     "green"),
-    TaskStatus.FAILED   : ("Failed",   "red"),
-    TaskStatus.KILLED   : ("Killed",   "purple")
+    TaskStatus.DISABLED : ("Disabled", "black", None),
+    TaskStatus.WAITING  : ("Waiting",  "cyan", None),
+    TaskStatus.READY    : ("Ready",    "blue", None),
+    TaskStatus.RUNNING  : ("Running",  "yellow", None),
+    TaskStatus.DONE     : ("Done",     "green", None),
+    TaskStatus.FAILED   : ("Failed",   "red", None),
+    TaskStatus.KILLED   : ("Killed",   "purple", None)
 }
 
 class TableProgressDisplay(object):
@@ -96,17 +96,13 @@ class TableProgressDisplay(object):
                                                  self._m_task_info_length['id'])))
         task_show_str_list.append(task_name.ljust(self._m_task_info_length['task_name']))
 
-        if task_status == TaskStatus.DISABLED:
-            highlight = False
-        else:
-            highlight = True
-
+        highlight = True
         if task_status == TaskStatus.DONE:
             self._m_running_task_set.discard(task_name)
 
-        status_desc, status_color = _TaskStatusColor[task_status]
+        status_desc, font_color, bg_color = _TaskStatusColor[task_status]
         status_desc_str = terminal.tint(status_desc.ljust(self._m_task_info_length['status']),
-                                        font_color=status_color, highlight=highlight)
+                                    font_color=font_color, bg_color=bg_color, highlight=highlight)
         task_show_str_list.append('|')
         task_show_str_list.append(status_desc_str)
 
