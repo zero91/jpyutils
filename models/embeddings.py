@@ -22,7 +22,7 @@ class Embeddings(object):
             (6B tokens, 400K vocab, uncased, 50d, 100d, 200d, & 300d vectors, 822 MB download)
 
     """
-    def __init__(self, local_dir="~/workspace/data/resources"):
+    def __init__(self, local_dir="~/.jpyutils/data/embeddings"):
         """Manage word embedding resources.
 
         Parameters
@@ -72,8 +72,10 @@ class Embeddings(object):
 
         resource_info: dict
             Word embeddings resource information.
-            If not None, it should contains 'url' of the resource
+            If not None, it should contains 'url' (for remote file) or
+            'local' (for local file)  of the resource
             and at least one dimension with its filelist.
+
 
         normalize: boolean
             Set True if you want a normalized embeddings.
@@ -94,15 +96,18 @@ class Embeddings(object):
             else:
                 resource_info = self.__resources_info[resource_name]
 
-        local_zip = "%s/%s" % (self.__local_dir, resource_name)
         if 'url' in resource_info:
-            utils.netdata.download(resource_info['url'], local_zip)
-            contents = utils.utilities.read_zip(local_zip, filelist=resource_info[dim], merge=True)
+            local_zip = "%s/%s" % (self.__local_dir, resource_name)
+            succeed, size = utils.netdata.download(resource_info['url'], local_zip)
+            if not succeed or size == 0:
+                raise IOError("Download file '%s' failed" % (resource_info['url']))
         elif 'local' in resource_info:
-            with open(resource_info['local'], 'r') as fin:
-                contents = fin.read()
+            local_zip = resource_info['local']
         else:
-            raise ValueError("The 'resource_info' you specified should at least has key 'url' or 'local'")
+            raise ValueError("The 'resource_info' you specified should at least "\
+                             "contains key 'url' or 'local'")
+
+        contents = utils.utilities.read_zip(local_zip, filelist=resource_info[dim], merge=True)
 
         word2id = dict()
         vocab_set = set(vocabulary) if vocabulary is not None else set()
