@@ -67,7 +67,8 @@ def text2array(sentences, word2id, maxlen=None, beg=0, end=1, unknown=2, padding
                 break
 
         if end is not None:
-            sent_ids = sent_ids[:maxlen - 1]
+            if len(sent_ids) == maxlen:
+                sent_ids.pop()
             sent_ids.append(end)
 
         array[i, :len(sent_ids)] = sent_ids
