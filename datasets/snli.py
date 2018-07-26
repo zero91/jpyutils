@@ -19,7 +19,7 @@ class SNLIDataset(Dataset):
 
     """
     def __init__(self, url="https://nlp.stanford.edu/projects/snli/snli_1.0.zip",
-                       local_dir="~/workspace/data/datasets"):
+                       local_dir="~/.jpyutils/data/datasets"):
         """Constructor
 
         Parameters
@@ -31,11 +31,11 @@ class SNLIDataset(Dataset):
             Local saving directory for this dataset.
 
         """
-        self.__url = url
-        self.__local_dir = os.path.realpath(os.path.expanduser(local_dir))
-        self.__zip_fname = "snli"
-        self.__model_data = dict()
-        self.__model_data_types = ['train', 'dev', 'test']
+        self._m_url = url
+        self._m_local_dir = os.path.realpath(os.path.expanduser(local_dir))
+        self._m_zip_fname = "snli"
+        self._m_model_data = dict()
+        self._m_model_data_types = ['train', 'dev', 'test']
 
     def load(self, dataset='sent_pair', tokenizer=None, lowercase=True):
         """Load 'dataset' for future processing.
@@ -53,9 +53,15 @@ class SNLIDataset(Dataset):
         lowercase: boolean
             Set True if you want to lower all the characters.
 
+        Returns
+        -------
+        data: dict
+            Dictionary for data, have key 'train' for training data,
+            'dev' for development data, 'test' for testing data.
+
         """
-        for model_data_type in self.__model_data_types:
-            if model_data_type not in self.__model_data:
+        for model_data_type in self._m_model_data_types:
+            if model_data_type not in self._m_model_data:
                 logging.info("Loading source data for %s" % (model_data_type))
                 self._load_source_data(model_data_type)
 
@@ -64,17 +70,17 @@ class SNLIDataset(Dataset):
         return None
 
     def _load_source_data(self, model_data_type):
-        local_fname = os.path.join(self.__local_dir, self.__zip_fname)
-        netdata.download(self.__url, local_fname)
-        self.__model_data[model_data_type] = \
+        local_fname = os.path.join(self._m_local_dir, self._m_zip_fname)
+        netdata.download(self._m_url, local_fname)
+        self._m_model_data[model_data_type] = \
                 utilities.read_zip(local_fname, ".*%s\.jsonl"% (model_data_type))
 
     def _load_sent_pair(self, tokenizer, lowercase):
         sent_pair_data = dict()
-        for model_data_type in self.__model_data_types:
+        for model_data_type in self._m_model_data_types:
             logging.info("Parse data %s" % (model_data_type))
             data = list()
-            for line in self.__model_data[model_data_type].split('\n'):
+            for line in self._m_model_data[model_data_type].split('\n'):
                 if line == "":
                     continue
                 if lowercase:
