@@ -7,6 +7,7 @@ import urllib.request
 import logging
 import ssl
 import random
+import time
 
 def download(url, save_fname, params=None, overwrite=False, chunk_size=1024 * 1024 * 16):
     """Download a file from remote site.
