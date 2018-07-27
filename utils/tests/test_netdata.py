@@ -28,14 +28,14 @@ class TestNetdata(unittest.TestCase):
         with self.assertRaises(IOError):
             utils.netdata.download(url, "%s/src.tar.gz/ttt" % (self.__random_dir))
 
-    def test_upload(self):
+    def test_post(self):
         url = "http://httpbin.org/post"
 
         params = {"name": "Donald", "usage": "test"}
         data = {"date": "2018-06-22"}
         files = {"code": __file__}
 
-        succeed, content = utils.netdata.upload(url, params=params, data=data, files=files)
+        succeed, content = utils.netdata.post(url, params=params, data=data, files=files)
         self.assertTrue(succeed)
         self.assertGreater(len(content), os.path.getsize(__file__))
 
