@@ -114,13 +114,17 @@ def post(url, files=None, data=None, json_data=None, params=None):
     return True, r.content
 
 
-def request(url, use_ssl=False, encoding='utf-8', retry=3, max_sleep_time=60):
+def request(url, data=None, use_ssl=False, encoding='utf-8', retry=3, max_sleep_time=60):
     """Fetch the content of a url.
 
     Parameters
     ----------
     url: str
         Url to fetch.
+
+    data: dict
+        Must be an object specifying additional data to be sent to the server,
+        or None if no such data is needed.
 
     use_ssl: boolean
         Whether request the url through a SSL conection or not.
@@ -152,7 +156,8 @@ def request(url, use_ssl=False, encoding='utf-8', retry=3, max_sleep_time=60):
     last_except = None
     for i in range(retry):
         try:
-            r = urllib.request.urlopen(url, context=ctx)
+            r = urllib.request.urlopen(url, data=urllib.parse.urlencode(data).encode(),
+                                            context=ctx)
             raw_data = r.read()
             return str(raw_data, r.headers.get_content_charset(encoding))
 
@@ -163,6 +168,6 @@ def request(url, use_ssl=False, encoding='utf-8', retry=3, max_sleep_time=60):
             logging.warning("Got HTTP Error %s. Sleeping %i seconds and trying again "\
                             "for other %i times", e.code, sleep_time, retry - i - 1)
 
-    logging.error("Error while requesting '%s'" % url)
+    logging.error("Error while requesting '%s', data = '%s'" % (url, str(data)))
     raise last_except
 
