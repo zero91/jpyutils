@@ -65,7 +65,7 @@ def download(url, save_fname, params=None, overwrite=False, chunk_size=1024 * 10
     return True, size
 
 
-def post(url, files=None, data=None, json_data=None, params=None):
+def post(url, files=None, data=None, **kwargs):
     """Upload files to remote site.
 
     Parameters
@@ -84,11 +84,8 @@ def post(url, files=None, data=None, json_data=None, params=None):
         Dictionary (will be form-encoded), bytes, or file-like object to send
         in the body of the :class:`Request`.
 
-    json: json (optional)
-        Json data to send in the body of the :class:`Request`.
-
-    params: bytes/dict (optional)
-        Dictionary or bytes to be sent in the query string for the :class:`Request`.
+    kwargs: Dictionary
+        Optional arguments that ``request'' takes.
 
     Returns
     -------
@@ -104,7 +101,7 @@ def post(url, files=None, data=None, json_data=None, params=None):
         for field_name, fname in files.items():
             files_stream[field_name] = open(fname, 'rb')
 
-    r = requests.post(url, data=data, json=json_data, files=files_stream, params=params)
+    r = requests.post(url, data=data, files=files_stream, **kwargs)
 
     for open_file in files_stream.values():
         open_file.close()
