@@ -65,7 +65,7 @@ def download(url, save_fname, params=None, overwrite=False, chunk_size=1024 * 10
     return True, size
 
 
-def post(url, files=None, data=None, **kwargs):
+def post(url, files=None, data=None, encoding="utf-8", **kwargs):
     """Upload files to remote site.
 
     Parameters
@@ -108,7 +108,7 @@ def post(url, files=None, data=None, **kwargs):
 
     if r.status_code != requests.codes.ok:
         return False, r.content
-    return True, r.content
+    return True, str(r.content, encoding)
 
 
 def request(url, data=None, use_ssl=False, encoding='utf-8', retry=3, max_sleep_time=60):
