@@ -107,7 +107,7 @@ def post(url, files=None, data=None, encoding="utf-8", **kwargs):
         open_file.close()
 
     if r.status_code != requests.codes.ok:
-        return False, r.content
+        return False, str(r.content, encoding)
     return True, str(r.content, encoding)
 
 
