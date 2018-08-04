@@ -169,3 +169,33 @@ def request(url, data=None, use_ssl=False, encoding='utf-8', retry=3, max_sleep_
     logging.error("Error while requesting '%s', data = '%s'" % (url, str(data)))
     raise last_except
 
+
+def delete(url, encoding="utf-8", **kwargs):
+    """Delete data.
+
+    Parameters
+    ----------
+    url: str
+        Url of remote server.
+
+    encoding: str
+        The encoding of the response content.
+
+    kwargs: Dictionary
+        Optional arguments that ``request'' takes.
+
+    Returns
+    -------
+    succeed: boolean
+        Result of the upload operation.
+
+    content: str
+        The returned content of remote server.
+
+    """
+    r = requests.delete(url, **kwargs)
+
+    if r.status_code != requests.codes.ok:
+        return False, str(r.content, encoding)
+    return True, str(r.content, encoding)
+
