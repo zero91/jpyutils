@@ -146,3 +146,24 @@ def is_fresh_file(fname, days=1):
         return True
     return False
 
+
+def get_path_create_time(path, time_format="%Y%m%d_%H%M%S"):
+    """Get create time of a path.
+
+    Parameters
+    ---------
+    path: str
+        Target path name.
+
+    time_format: str
+        The path time's format.
+
+    Returns
+    -------
+    create_time: str
+        The path create time's format string.
+
+    """
+    create_timestamp = os.path.getctime(path)
+    return time.strftime(time_format, time.localtime(create_timestamp))
+
