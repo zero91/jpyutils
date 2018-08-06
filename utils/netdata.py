@@ -159,11 +159,11 @@ def request(url, data=None, use_ssl=False, encoding='utf-8', retry=3, max_sleep_
             raw_data = r.read()
             return str(raw_data, r.headers.get_content_charset(encoding))
 
-        except urllib.error.HTTPError as e:
+        except (urllib.error.HTTPError, urllib.error.URLError) as e:
             last_except = e
             sleep_time = random.randrange(0, max_sleep_time)
             time.sleep(sleep_time)
-            logging.warning("Got HTTP Error %s. Sleeping %i seconds and trying again "\
+            logging.warning("Got Error %s. Sleeping %i seconds and trying again "\
                             "for other %i times", e.code, sleep_time, retry - i - 1)
 
     logging.error("Error while requesting '%s', data = '%s'" % (url, str(data)))
