@@ -164,7 +164,7 @@ def request(url, data=None, use_ssl=False, encoding='utf-8', retry=3, max_sleep_
             sleep_time = random.randrange(0, max_sleep_time)
             time.sleep(sleep_time)
             logging.warning("Got Error %s. Sleeping %i seconds and trying again "\
-                            "for other %i times", e.code, sleep_time, retry - i - 1)
+                            "for other %i times", e.__class__.__name__, sleep_time, retry - i - 1)
 
     logging.error("Error while requesting '%s', data = '%s'" % (url, str(data)))
     raise last_except
