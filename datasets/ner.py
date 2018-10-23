@@ -5,10 +5,12 @@ from __future__ import absolute_import
 from .dataset import Dataset
 from ..utils import netdata
 from ..utils import utilities
+from .. import mltools
 import os
 import urllib.parse
 import collections
 import logging
+import operator
 
 class NERDataset(Dataset):
     """Name Entity Recognition Dataset.
@@ -29,7 +31,7 @@ class NERDataset(Dataset):
         ----------
         dataset: str
             Dataset which can be used to do some research.
-            Current supported dataset is 'sent_pair'.
+            Current supported dataset are 'MSRA' and 'CoNLL2003'.
 
         tokenizer: Tokenizer
             Tokenizer which should has a 'tokenize' method that
@@ -45,16 +47,23 @@ class NERDataset(Dataset):
             'dev' for development data, 'test' for testing data.
 
         """
-        if dataset.lower() == "msra":
+        if dataset.lower() == "MSRA".lower():
             return self._load_MSRA()
+
+        elif dataset.lower() == "CoNLL2003".lower():
+            return self._load_CoNLL2003()
 
         raise ValueError("Can't find data for '%s'" % (dataset))
 
     def _load_MSRA(self):
         logging.info("Loading NER/MSRA data...")
-        save_fname = os.path.basename(urllib.parse.urlparse(self._m_dataset_conf["MSRA"]).path)
-        save_fname = os.path.join(self._m_dataset_path, save_fname)
+        save_fname = os.path.join(
+            self._m_dataset_path,
+            os.path.basename(urllib.parse.urlparse(self._m_dataset_conf["MSRA"]).path)
+        )
         succeed, _ =  netdata.download(self._m_dataset_conf["MSRA"], save_fname)
+        if not succeed:
+            raise IOError("Download '%s' failed" % (self._m_dataset_conf['MSRA']))
 
         msra_ner_data = dict()
         # O, B-PER, I-PER, B-LOC, I-LOC, B-ORG, I-ORG
@@ -83,4 +92,40 @@ class NERDataset(Dataset):
                 msra_ner_data[data_type].append(sentence)
         logging.info("Load NER/MSRA data succeed!")
         return msra_ner_data
+
+    def _load_CoNLL2003(self):
+        logging.info("Loading NER/CoNLL2003 data...")
+        save_fname = os.path.join(
+            self._m_dataset_path,
+            os.path.basename(urllib.parse.urlparse(self._m_dataset_conf["CoNLL2003"]).path)
+        )
+        succeed, _ =  netdata.download(self._m_dataset_conf["CoNLL2003"], save_fname)
+        if not succeed:
+            raise IOError("Download '%s' failed" % (self._m_dataset_conf['MSRA']))
+
+        conll2003_ner_data = dict()
+        for data_type, data_fname in [("train", "eng.train"),
+                                      ("dev", "eng.testa"),
+                                      ("test", "eng.testb")]:
+            conll2003_ner_data[data_type] = list()
+            sentence = list()
+            for line in utilities.read_zip(save_fname, data_fname).split('\n'):
+                fields = line.strip().split()
+                if len(fields) != 4:
+                    if len(sentence) > 0 and sentence[0][0] != "-DOCSTART-":
+                        conll2003_ner_data[data_type].append(self._convert_tags(sentence))
+                    sentence = list()
+                else:
+                    word, pos_tag, chunk_tag, ner_tag = fields
+                    sentence.append((word, ner_tag))
+            if len(sentence) > 0 and sentence[0][0] != "-DOCSTART-":
+                conll2003_ner_data[data_type].append(sself._convert_tags(entence))
+        logging.info("Load NER/CoNLL2003 data succeed!")
+        return conll2003_ner_data
+
+    def _convert_tags(self, sentence):
+        tags = list(map(operator.itemgetter(1), sentence))
+        if not mltools.utils.tags.iob1_to_iob2(tags):
+            raise ValueError("Invalid tags: %s"% (sentence))
+        return list(map(lambda wt, new_tag: (wt[0], new_tag), sentence, tags))
 
