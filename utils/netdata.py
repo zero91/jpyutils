@@ -154,7 +154,7 @@ def request(url, data=None, use_ssl=False, encoding='utf-8', retry=3, max_sleep_
     for i in range(retry):
         try:
             if data is not None:
-                data = urllib.parse.urlencode(data).encode(),
+                data = urllib.parse.urlencode(data).encode()
             r = urllib.request.urlopen(url, data=data, context=ctx)
             raw_data = r.read()
             return str(raw_data, r.headers.get_content_charset(encoding))

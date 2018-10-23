@@ -119,6 +119,9 @@ def read_zip(zipfname, filelist=None, merge=False, encoding='utf-8', sep='\n'):
                 and len(contents[fname]) > 0 and contents[fname][-1] != sep:
             contents[fname][-1] += sep
 
+    if len(contents) == 0:
+        raise IOError("Can't find any file in filelist [%s]" % (filelist))
+
     if len(contents) <= 1 or merge is True:
         return "".join(contents.values())
     return contents
