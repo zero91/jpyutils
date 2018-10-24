@@ -1,0 +1,10 @@
+
+cache_path: ~/.jpyutils
+
+datasets:
+    path: datasets
+
+    NER:
+        CoNLL2003: https://raw.githubusercontent.com/zero91/data/master/NER/CoNLL2003.zip
+        MSRA: https://raw.githubusercontent.com/zero91/data/master/NER/MSRA.zip
+
