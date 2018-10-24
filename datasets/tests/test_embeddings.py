@@ -34,6 +34,11 @@ class TestEmbeddings(unittest.TestCase):
         for elem in norm:
             self.assertAlmostEqual(elem, 1.0)
 
+    def test_add_data(self):
+        self.assertNotIn("test", self.__p_embeddings._m_dataset_conf)
+        self.__p_embeddings.add_data("test", "http://jpyutils.demo.com/xx", {300: ".*"})
+        self.assertIn("test", self.__p_embeddings._m_dataset_conf)
+
     def tearDown(self):
         pass
 

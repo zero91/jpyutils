@@ -32,6 +32,56 @@ class Embeddings(Dataset):
         self._m_dataset_conf = self._m_datasets_conf["embeddings"]
         self._m_dataset_path = os.path.join(self._m_datasets_path, "embeddings")
 
+    def add_data(self, dataset, url, dimension, local=None):
+        """Add new embedding data configuration.
+
+        Parameters
+        ----------
+        dataset: str
+            Embeddings dataset name.
+
+        url: str
+            The download url of the dataset. Remote type of dataset must be zip file.
+
+        dimension: dict
+            Dimension of the embedding data. Format:
+                {
+                    dim_1: file_pattern_1,
+                    dim_2: file_pattern_2,
+                }
+
+        local: str
+            Local path of the embedding data.
+            Set url to None if you want this parameter to take effect.
+
+        Returns
+        -------
+        succeed: bool
+            True if succeed otherwise False.
+
+        """
+        if dataset in self._m_dataset_conf:
+            raise KeyError("Dataset '%s' already exists" % (dataset))
+
+        if not isinstance(dimension, dict):
+            raise TypeError("parameter 'dimension' must be of type 'dict'")
+
+        for dim, file_pattern in dimension.items():
+            if not isinstance(dim, int):
+                raise TypeError("Key of parameter 'dimension' must be of type 'int'")
+
+        if url is not None:
+            self._m_dataset_conf[dataset] = { "url": url }
+
+        elif local is not None:
+            self._m_dataset_conf[dataset] = { "local": local }
+
+        else:
+            raise ValueError("You should specify the dataset's path " \
+                             "by setting the value of 'url' or 'local'")
+        self._m_dataset_conf[dataset].update(dimension)
+        return True
+
     def load(self, dataset, dim=300, vocabulary=None, id_shift=0, normalize=True):
         """Load word embeddings resources.
 
@@ -85,7 +135,7 @@ class Embeddings(Dataset):
             if not succeed or size == 0:
                 raise IOError("Download file '%s' failed" % (self._m_dataset_conf[dataset]['url']))
 
-        elif 'local' in self._m_data_conf[dataset]:
+        elif 'local' in self._m_dataset_conf[dataset]:
             local_zip = self._m_dataset_conf[dataset]['local']
 
         else:
