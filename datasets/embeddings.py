@@ -6,10 +6,13 @@ import os
 import gzip
 import zipfile
 import logging
+import urllib
 import numpy as np
-from jpyutils import utils
 
-class Embeddings(object):
+from .dataset import Dataset
+from .. import utils
+
+class Embeddings(Dataset):
     """Manage word embedding resources.
 
     Supported Embeddings Resources:
@@ -22,36 +25,14 @@ class Embeddings(object):
             (6B tokens, 400K vocab, uncased, 50d, 100d, 200d, & 300d vectors, 822 MB download)
 
     """
-    def __init__(self, local_dir="~/.jpyutils/data/embeddings"):
-        """Manage word embedding resources.
-
-        Parameters
-        ----------
-        local_dir: str
-            Local path for saving resources.
-
+    def __init__(self):
+        """Constructor.
         """
-        self.__local_dir = os.path.realpath(os.path.expanduser(local_dir))
-        self.__resources_info = {
-            "glove.42B.300d": {
-                "url": "http://nlp.stanford.edu/data/glove.42B.300d.zip",
-                300: ".*",
-            },
-            "glove.840B.300d": {
-                "url": "http://nlp.stanford.edu/data/glove.840B.300d.zip",
-                300: ".*",
-            },
-            "glove.6B": {
-                "url": "http://nlp.stanford.edu/data/glove.6B.zip",
-                50: "glove.6B.50d.txt",
-                100: "glove.6B.100d.txt",
-                200: "glove.6B.200d.txt",
-                300: "glove.6B.300d.txt",
-            }
-        }
+        super(self.__class__, self).__init__()
+        self._m_dataset_conf = self._m_datasets_conf["embeddings"]
+        self._m_dataset_path = os.path.join(self._m_datasets_path, "embeddings")
 
-    def load(self, resource_name, dim, vocabulary=None, id_shift=0,
-                                       resource_info=None, normalize=True):
+    def load(self, dataset, dim=300, vocabulary=None, id_shift=0, normalize=True):
         """Load word embeddings resources.
 
         Parameters
@@ -89,29 +70,35 @@ class Embeddings(object):
             Word's embeddings matrix.
 
         """
-        if resource_info is None:
-            if resource_name not in self.__resources_info:
-                raise ValueError("Can't find resource info for '%s', you need to specified "\
-                        "it by setting value of parameter 'resource_info'" % (resource_name))
-            else:
-                resource_info = self.__resources_info[resource_name]
+        if dataset not in self._m_dataset_conf:
+            raise KeyError("Can't find dataset '%s'" % (dataset))
 
-        if 'url' in resource_info:
-            local_zip = "%s/%s" % (self.__local_dir, resource_name)
-            succeed, size = utils.netdata.download(resource_info['url'], local_zip)
+        if dim not in self._m_dataset_conf[dataset]:
+            raise KeyError("Can't find dimension=%d for dataset '%s'" % (dim, dataset))
+
+        if 'url' in self._m_dataset_conf[dataset]:
+            local_zip = os.path.join(
+                self._m_dataset_path,
+                os.path.basename(urllib.parse.urlparse(self._m_dataset_conf[dataset]['url']).path)
+            )
+            succeed, size = utils.netdata.download(self._m_dataset_conf[dataset]['url'], local_zip)
             if not succeed or size == 0:
-                raise IOError("Download file '%s' failed" % (resource_info['url']))
-        elif 'local' in resource_info:
-            local_zip = resource_info['local']
-        else:
-            raise ValueError("The 'resource_info' you specified should at least "\
-                             "contains key 'url' or 'local'")
+                raise IOError("Download file '%s' failed" % (self._m_dataset_conf[dataset]['url']))
 
-        contents = utils.utilities.read_zip(local_zip, filelist=resource_info[dim], merge=True)
+        elif 'local' in self._m_data_conf[dataset]:
+            local_zip = self._m_dataset_conf[dataset]['local']
+
+        else:
+            raise ValueError("You should specify the dataset's path " \
+                             "by setting the value of 'url' or 'local'")
 
         word2id = dict()
         vocab_set = set(vocabulary) if vocabulary is not None else set()
         vectors = list()
+
+        contents = utils.utilities.read_zip(local_zip,
+                                            filelist=self._m_dataset_conf[dataset][dim],
+                                            merge=True)
         for line_cnt, line in enumerate(contents.split('\n'), 1):
             if len(line) == 0:
                 continue
@@ -133,7 +120,7 @@ class Embeddings(object):
                 logging.warning("vector of word [%s] already exists" % (fields[0]))
                 continue
 
-            vectors.append(np.array(list(map(float, fields[1:])), dtype=np.float32))
+            vectors.append(list(map(float, fields[1:])))
             word2id[fields[0]] = len(word2id) + id_shift
             if line_cnt % 50000 == 0:
                 logging.info("Read %.2fK lines" % (line_cnt / 1000.))

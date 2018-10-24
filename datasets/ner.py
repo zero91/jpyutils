@@ -24,7 +24,7 @@ class NERDataset(Dataset):
         self._m_dataset_path = os.path.join(self._m_datasets_path, "NER")
         self._m_pos2entity = {"nr": "PER", "ns": "LOC", "nt": "ORG"}
 
-    def load(self, dataset, tokenizer=None, lowercase=True):
+    def load(self, dataset, **args):
         """Load 'dataset' for future processing.
 
         Parameters

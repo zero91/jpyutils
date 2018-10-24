@@ -19,6 +19,6 @@ class Dataset(abc.ABC):
                                              self._m_datasets_conf["path"])
 
     @abc.abstractmethod
-    def load(self, dataset=None, tokenizer=None, lowercase=True):
+    def load(self, dataset, **args):
         pass
 
