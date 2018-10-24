@@ -9,13 +9,7 @@ from . import netdata
 from . import monitor
 from . import terminal
 
-try:
-    # In environment which doesn't support tensorflow, an exception will occurred.
-    from . import text
-    __all__ = ["random", "utilities", "netdata", "text", "monitor", "terminal"]
-
-except Exception as e:
-    __all__ = ["random", "utilities", "netdata", "monitor", "terminal"]
+__all__ = ["random", "utilities", "netdata", "monitor", "terminal"]
 
 """
 from . import check

@@ -1,6 +1,7 @@
 from . import tags
+from . import text
 
-__all__ = ["tags"]
+__all__ = ["tags", "text"]
 
 #from .validation import check_consistent_length
 #from .validation import column_or_1d
