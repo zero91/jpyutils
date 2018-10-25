@@ -1,8 +1,66 @@
 from __future__ import division
 from __future__ import print_function
 from __future__ import absolute_import
+
+import operator
+import collections
+import itertools
 import numpy as np
 import tensorflow as tf
+
+
+def build_dict(sentences, extra_dict=None, min_freq=0):
+    """Build a dictionary sorted by frequency.
+
+    Parameters
+    ----------
+    sentences: list
+        The source sentences, the supported format are:
+        (1) [w1, w2, wk]
+        (2) [[w11, w12, w1k], ..., [wn1, wn2, wnk]]
+
+    extra_dict: dict
+        Extra word added the final dictionary. e.g.
+            {
+                "<BEG>": 1000000,
+                "<END>": 1000000,
+            }
+        Set the value to be greater than parameter 'min_freq' if you want the key to be valid.
+
+    min_freq: int
+        Minimum frequency of the words. Frequency less than parameter 'min_freq' is discard.
+
+    Returns
+    -------
+    freq_dict: dict
+        Frequency of each word, including the less frequent words which was discarded.
+
+    word2id: dict
+        The id of each word. word => id
+
+    id2word: dict
+        The word of each id. id => word
+
+    """
+    if not isinstance(sentences, (list, tuple)):
+        raise TypeError("Parameter 'sentences' must be an instance of list")
+
+    if len(sentences) == 0:
+        raise ValueError("Parameter 'sentences' is empty")
+
+    if not isinstance(sentences[0], (list, tuple)):
+        sentences = [sentences]
+
+    freq_dict = collections.Counter(itertools.chain(*sentences))
+    if isinstance(extra_dict, dict):
+        freq_dict.update(extra_dict)
+
+    freq_list = sorted(freq_dict.items(), key=operator.itemgetter(1), reverse=True)
+    words, _ = zip(*filter(lambda wc: wc[1] >= min_freq, freq_list))
+    word2id = dict(zip(words, range(len(words))))
+    id2word = {v: k for k, v in word2id.items()}
+    return freq_dict, word2id, id2word
+
 
 def text2array(sentences, word2id, maxlen=None, beg=0, end=1, unknown=2, padding=3):
     """Convert a text into a two-dimensional array.
@@ -141,3 +199,4 @@ def mask3d(values, sentence_sizes, mask_value, axis=2):
     if axis == 1:
         masked = tf.transpose(masked, [0, 2, 1])
     return masked
+

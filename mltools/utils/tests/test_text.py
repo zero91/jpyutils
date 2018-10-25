@@ -88,6 +88,24 @@ class TestRandom(unittest.TestCase):
         self.assertEqual(masked1.tolist(), [[[0, 99, 99], [0, 99, 99]], [[2, 1, 99],[3, 4, 99]]])
         sess.close()
 
+    def test_build_dict(self):
+        sentences = [
+            ["hello", "world"],
+            ["It", "is", "raining", "outside"],
+            ["hello", ",", "the", "world", "is", "in", "chaos"]
+        ]
+        word_cnt, word2id, id2word = utils.text.build_dict(sentences)
+        self.assertEqual(len(word_cnt), 10)
+        self.assertEqual(len(word2id), 10)
+
+        word_cnt, word2id, id2word = utils.text.build_dict(sentences, min_freq=2)
+        self.assertEqual(len(word_cnt), 10)
+        self.assertEqual(len(word2id), 3)
+
+        word_cnt, word2id, id2word = utils.text.build_dict(sentences, min_freq=2,
+                                                           extra_dict={"BEG": 100, "END": 100})
+        self.assertEqual(len(word_cnt), 12)
+        self.assertEqual(len(word2id), 5)
 
     def tearDown(self):
         pass
