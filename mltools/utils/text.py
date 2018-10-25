@@ -7,6 +7,7 @@ import collections
 import itertools
 import numpy as np
 import tensorflow as tf
+import jieba
 
 
 def build_dict(sentences, extra_dict=None, min_freq=0):
@@ -199,4 +200,36 @@ def mask3d(values, sentence_sizes, mask_value, axis=2):
     if axis == 1:
         masked = tf.transpose(masked, [0, 2, 1])
     return masked
+
+
+def word_seg_tags(sentence):
+    """Get a word segmentation tags for a sentence using BMES tag method.
+
+    Parameters
+    ----------
+    sentence: str
+        An sentence you want to segment.
+
+    Returns
+    -------
+    seg_tags: list
+        An ID list which indicate the position of the char in the word.
+
+    id2tag: dict
+        ID to tag string mapping. ID => tag
+
+    """
+    tag2id = {"B": 0, "M": 1, "E": 2, "S": 3}
+    id2tag = {v: k for k, v in tag2id.items()}
+
+    seg_tags = list()
+    for word in jieba.cut(sentence):
+        if len(word) == 1:
+            seg_tags.append(tag2id['S'])
+        else:
+            word_tags = [tag2id['M']] * len(word)
+            word_tags[0] = tag2id['B']
+            word_tags[-1] = tag2id['E']
+            seg_tags.extend(word_tags)
+    return seg_tags, id2tag
 

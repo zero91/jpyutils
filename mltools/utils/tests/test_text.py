@@ -107,6 +107,12 @@ class TestRandom(unittest.TestCase):
         self.assertEqual(len(word_cnt), 12)
         self.assertEqual(len(word2id), 5)
 
+    def test_word_seg_tags(self):
+        sentence = "中华人民共和国今天成立了"
+        seg_tags, id2tag = utils.text.word_seg_tags(sentence)
+        self.assertEqual(len(seg_tags), len(sentence))
+        self.assertEqual(len(id2tag), 4)
+
     def tearDown(self):
         pass
 
