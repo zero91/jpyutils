@@ -24,3 +24,6 @@ datasets:
             200: "glove.6B.200d.txt"
             300: "glove.6B.300d.txt"
 
+        cc.zh.300.vec:
+            url: "https://s3-us-west-1.amazonaws.com/fasttext-vectors/word-vectors-v2/cc.zh.300.vec.gz"
+            300: ".*"

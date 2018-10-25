@@ -82,13 +82,13 @@ class Embeddings(Dataset):
         self._m_dataset_conf[dataset].update(dimension)
         return True
 
-    def load(self, dataset, dim=300, vocabulary=None, id_shift=0, normalize=True):
+    def load(self, dataset, dim=300, vocabulary=None, extra_dict=None, normalize=True):
         """Load word embeddings resources.
 
         Parameters
         ----------
-        resource_name: str
-            Embeddings resource name.
+        dataset: str
+            Dataset of embeddings.
 
         dim: tuple
             Dimension of the embeddings resource.
@@ -96,17 +96,13 @@ class Embeddings(Dataset):
         vocabulary: list
             Word candidates for which we need to extract word embeddings.
 
-        id_shift: integer
-            Minimum word id for existing word.
-            'id_shift' randomized word vectors will be generated,
-            and will be appended in the front of the embeddings.
-
-        resource_info: dict
-            Word embeddings resource information.
-            If not None, it should contains 'url' (for remote file) or
-            'local' (for local file)  of the resource
-            and at least one dimension with its filelist.
-
+        extra_dict: dict
+            Extra word added the final dictionary and create ramdom embeddings for the word.
+            e.g.
+                {
+                    "<BEG>": 1000000,
+                    "<END>": 1000000,
+                }
 
         normalize: boolean
             Set True if you want a normalized embeddings.
@@ -115,6 +111,9 @@ class Embeddings(Dataset):
         -------
         word2id: dict
             Word's id which has embeddings.
+
+        id2word: dict
+            id to word mapping, id => word.
 
         word_embeddings: np.array
             Word's embeddings matrix.
@@ -142,14 +141,22 @@ class Embeddings(Dataset):
             raise ValueError("You should specify the dataset's path " \
                              "by setting the value of 'url' or 'local'")
 
-        word2id = dict()
+        word2id = dict() if extra_dict is None else extra_dict.copy()
         vocab_set = set(vocabulary) if vocabulary is not None else set()
         vectors = list()
 
-        contents = utils.utilities.read_zip(local_zip,
-                                            filelist=self._m_dataset_conf[dataset][dim],
-                                            merge=True)
-        for line_cnt, line in enumerate(contents.split('\n'), 1):
+        if local_zip.split(".")[-1] == "zip":
+            contents = utils.utilities.read_zip(local_zip,
+                                                filelist=self._m_dataset_conf[dataset][dim],
+                                                merge=True).split('\n')
+        elif local_zip.split(".")[-1] == "gz":
+            contents = gzip.open(local_zip, "rt")
+
+        else:
+            with open(local_zip, 'r') as fin:
+                contents = fin.readlines()
+
+        for line_cnt, line in enumerate(contents, 1):
             if len(line) == 0:
                 continue
             fields = line.rsplit(maxsplit=dim)
@@ -171,19 +178,20 @@ class Embeddings(Dataset):
                 continue
 
             vectors.append(list(map(float, fields[1:])))
-            word2id[fields[0]] = len(word2id) + id_shift
+            word2id[fields[0]] = len(word2id)
             if line_cnt % 50000 == 0:
                 logging.info("Read %.2fK lines" % (line_cnt / 1000.))
 
         word_embeddings = np.array(vectors, dtype=np.float32)
-        if id_shift > 0:
-            word_embeddings = np.append(self.generate((id_shift, dim), normalize=False),
+        if extra_dict is not None:
+            word_embeddings = np.append(self.generate((len(extra_dict), dim), normalize=False),
                                         word_embeddings, axis=0)
 
         if normalize:
             norms = np.linalg.norm(word_embeddings, axis=1).reshape((-1, 1))
             word_embeddings /= norms
-        return word2id, word_embeddings
+        id2word = {v: k for k, v in word2id.items()}
+        return word2id, id2word, word_embeddings
 
     def generate(self, shape, normalize=True):
         """Generate random embeddings.

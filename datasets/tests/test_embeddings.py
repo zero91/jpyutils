@@ -18,13 +18,15 @@ class TestEmbeddings(unittest.TestCase):
         with self.assertRaises(KeyError):
             self.__p_embeddings.load("test", 300)
 
-        word2id, word_embeddings = self.__p_embeddings.load("glove.6B", 50)
-        self.assertEqual(word_embeddings.shape[0], len(word2id))
-        self.assertEqual(word_embeddings.shape[1], 50)
+        word2id, id2word, word_embeddings_1 = self.__p_embeddings.load("glove.6B", 50)
+        self.assertEqual(word_embeddings_1.shape[0], len(word2id))
+        self.assertEqual(word_embeddings_1.shape[1], 50)
 
-        word2id, word_embeddings = self.__p_embeddings.load("glove.6B", 50, id_shift=3)
-        self.assertEqual(word_embeddings.shape[0], len(word2id) + 3)
-        self.assertEqual(word_embeddings.shape[1], 50)
+        word2id, id2word, word_embeddings_2 = self.__p_embeddings.load(
+                "glove.6B", dim=50, extra_dict={"<BEG>": 0, "<END>": 1, "<UNK>": 2})
+        self.assertEqual(word_embeddings_2.shape[0], len(word2id))
+        self.assertEqual(word_embeddings_2.shape[1], 50)
+        self.assertEqual(word_embeddings_1.shape[0] + 3, word_embeddings_2.shape[0])
 
     def test_generate(self):
         random_embeddings = self.__p_embeddings.generate((3, 50))

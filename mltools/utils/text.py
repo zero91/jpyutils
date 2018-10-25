@@ -32,7 +32,7 @@ def build_dict(sentences, extra_dict=None, min_freq=0):
 
     Returns
     -------
-    freq_dict: dict
+    word_cnt: dict
         Frequency of each word, including the less frequent words which was discarded.
 
     word2id: dict
@@ -51,15 +51,15 @@ def build_dict(sentences, extra_dict=None, min_freq=0):
     if not isinstance(sentences[0], (list, tuple)):
         sentences = [sentences]
 
-    freq_dict = collections.Counter(itertools.chain(*sentences))
+    word_cnt = collections.Counter(itertools.chain(*sentences))
     if isinstance(extra_dict, dict):
-        freq_dict.update(extra_dict)
+        word_cnt.update(extra_dict)
 
-    freq_list = sorted(freq_dict.items(), key=operator.itemgetter(1), reverse=True)
-    words, _ = zip(*filter(lambda wc: wc[1] >= min_freq, freq_list))
+    word_cnt_list = sorted(word_cnt.items(), key=operator.itemgetter(1), reverse=True)
+    words, _ = zip(*filter(lambda wc: wc[1] >= min_freq, word_cnt_list))
     word2id = dict(zip(words, range(len(words))))
     id2word = {v: k for k, v in word2id.items()}
-    return freq_dict, word2id, id2word
+    return word_cnt, word2id, id2word
 
 
 def text2array(sentences, word2id, maxlen=None, beg=0, end=1, unknown=2, padding=3):
