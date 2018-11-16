@@ -178,3 +178,85 @@ def iobes_to_iob(tags):
         if pos == 'E': new_tags[i] = 'I-' + tag_name
     return new_tags
 
+
+def is_start_chunk(prev_tag, cur_tag):
+    """Check if an entity started between the previous and current tags.
+
+    Parameters
+    ----------
+    prev_tag: str
+        Previous chunk tag.
+
+    cur_tag: str
+        Current chunk tag.
+
+    Returns
+    -------
+    chunk_start: boolean.
+        True if current tag is the started part of a entity, otherwise False.
+
+    """
+    if cur_tag == 'O': return False
+    if prev_tag == 'O': return True
+
+    cur_tag_pos, cur_tag_name = cur_tag.split('-')
+    prev_tag_pos, prev_tag_name = prev_tag.split('-')
+    if cur_tag_pos in ['B', 'S'] or cur_tag_name != prev_tag_name or prev_tag_pos in ['E', 'S']:
+        return True
+
+    return False
+
+
+def is_end_chunk(prev_tag, cur_tag):
+    """Check if a entity ended between the previous and current tags.
+
+    Parameters
+    ----------
+    prev_tag: str
+        Previous chunk tag.
+
+    cur_tag: str
+        Current chunk tag.
+
+    Returns
+    -------
+    chunk_start: boolean.
+        True if previous tag is the end part of a entity, otherwise False.
+
+    """
+    if prev_tag == 'O': return False
+    if cur_tag == 'O': return True
+
+    cur_tag_pos, cur_tag_name = cur_tag.split('-')
+    prev_tag_pos, prev_tag_name = prev_tag.split('-')
+    if prev_tag_pos in ['E', 'S'] or cur_tag_name != prev_tag_name or cur_tag_pos in ['B', 'S']:
+        return True
+
+    return False
+
+
+def get_entities(tags):
+    """Get entities from list of tags.
+
+    Parameters
+    ----------
+    tags: list
+        List of tags.
+
+    Returns
+    -------
+    entities: list
+        List of entities, each format as (entity_type, entity_start, entity_end).
+
+    """
+    entities = list()
+    begin = -1
+    for i, tag in enumerate(tags):
+        if is_start_chunk(tags[i - 1] if i > 0 else 'O', tag):
+            begin = i
+
+        if is_end_chunk(tag, tags[i + 1] if i + 1 != len(tags) else 'O'):
+            entities.append((tag.split('-')[1], begin, i))
+
+    return entities
+
