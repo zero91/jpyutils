@@ -6,6 +6,7 @@ import os
 import gzip
 import zipfile
 import logging
+import operator
 import urllib
 import numpy as np
 
@@ -97,12 +98,16 @@ class Embeddings(Dataset):
             Word candidates for which we need to extract word embeddings.
 
         extra_dict: dict
-            Extra word added the final dictionary and create ramdom embeddings for the word.
+            Extra words added to the final dictionary and create ramdom embeddings for these word.
             e.g.
                 {
-                    "<BEG>": 1000000,
-                    "<END>": 1000000,
+                    "<BEG>": 0,
+                    "<END>": 1,
                 }
+            Note:
+                The embeddings of this extra vocabulary will be appended before loaded embeddings.
+                The word ID of these extra vocabulary will be ordered by their value
+                in ascending order.
 
         normalize: boolean
             Set True if you want a normalized embeddings.
@@ -141,7 +146,11 @@ class Embeddings(Dataset):
             raise ValueError("You should specify the dataset's path " \
                              "by setting the value of 'url' or 'local'")
 
-        word2id = dict() if extra_dict is None else extra_dict.copy()
+        word2id = dict()
+        if extra_dict is not None:
+            for word, word_id in sorted(extra_dict.items(), key=operator.itemgetter(1)):
+                word2id[word] = len(word2id)
+
         vocab_set = set(vocabulary) if vocabulary is not None else set()
         vectors = list()
 

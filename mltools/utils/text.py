@@ -63,7 +63,7 @@ def build_dict(sentences, extra_dict=None, min_freq=0):
     return word_cnt, word2id, id2word
 
 
-def text2array(sentences, word2id, maxlen=None, beg=0, end=1, unknown=2, padding=3):
+def text2array(sentences, word2id, maxlen=None, beg=None, end=None, unknown=None, padding=None):
     """Convert a text into a two-dimensional array.
 
     Parameters
@@ -72,7 +72,7 @@ def text2array(sentences, word2id, maxlen=None, beg=0, end=1, unknown=2, padding
         Two dimension list of sentences.
 
     word2id: dict
-        Mapping dictionary for word to id.
+        Mapping dictionary for word to id. Set to None if you want to use the identity mapping.
 
     maxlen: integer
         Maximum length of each sentences.
@@ -119,9 +119,14 @@ def text2array(sentences, word2id, maxlen=None, beg=0, end=1, unknown=2, padding
             sent_ids.append(beg)
 
         for token in sent:
-            if token not in word2id and unknown is None:
+            if word2id is not None and token not in word2id and unknown is None:
                 continue
-            sent_ids.append(word2id.get(token, unknown))
+
+            if word2id is not None:
+                sent_ids.append(word2id.get(token, unknown))
+            else:
+                sent_ids.append(token)
+
             if len(sent_ids) == maxlen:
                 break
 
@@ -156,7 +161,7 @@ def clip_sentence(sentences, sizes):
 
 
 def mask3d(values, sentence_sizes, mask_value, axis=2):
-    """Given a batch of matrices, each with shape m x n, mask the values in each
+    """Given a batch of metrices, each with shape m x n, mask the values in each
     row after the positions indicated in sentence_sizes.
 
     Parameters
@@ -212,24 +217,27 @@ def word_seg_tags(sentence):
 
     Returns
     -------
-    seg_tags: list
+    seg_ids: list
         An ID list which indicate the position of the char in the word.
 
     id2tag: dict
         ID to tag string mapping. ID => tag
 
+    tag2id: dict
+        tag to ID mapping. tag = > ID
+
     """
     tag2id = {"B": 0, "M": 1, "E": 2, "S": 3}
     id2tag = {v: k for k, v in tag2id.items()}
 
-    seg_tags = list()
+    seg_ids = list()
     for word in jieba.cut(sentence):
         if len(word) == 1:
-            seg_tags.append(tag2id['S'])
+            seg_ids.append(tag2id['S'])
         else:
             word_tags = [tag2id['M']] * len(word)
             word_tags[0] = tag2id['B']
             word_tags[-1] = tag2id['E']
-            seg_tags.extend(word_tags)
-    return seg_tags, id2tag
+            seg_ids.extend(word_tags)
+    return seg_ids, id2tag, tag2id
 
