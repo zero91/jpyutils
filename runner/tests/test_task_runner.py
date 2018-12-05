@@ -16,12 +16,14 @@ class TestTaskRunner(unittest.TestCase):
         pass
 
     def test_join(self):
-        task = runner.TaskRunner(["curl", "https://www.baidu.com"],
-                                 stdout=subprocess.PIPE,
-                                 stderr=subprocess.PIPE)
+        task = runner.TaskRunner(
+            cmd=["curl", "https://www.baidu.com"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
         task.start()
         task.join()
-        self.assertEqual(task.info['returncode'], 0)
+        self.assertEqual(task.exitcode, 0)
 
 if __name__ == "__main__":
     unittest.main()

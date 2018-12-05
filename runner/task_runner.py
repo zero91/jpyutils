@@ -1,10 +1,8 @@
-"""Running a simple task in a separate process.
-
-Manage the created process, and retry at least 'retry' times util succeed.
-"""
+"""Run a command in a separate process."""
 from __future__ import division
 from __future__ import print_function
 from __future__ import absolute_import
+
 import os
 import subprocess
 import threading
@@ -13,21 +11,19 @@ import time
 import signal
 
 class TaskRunner(threading.Thread):
-    """Maintaining a task in a python thread.
+    """Run a command in an independent process, and maintain the new created process in a thread.
 
-    Running task in a independent process.
-
-    The full function signature is largely the same as that of the Popen constructor,
-    except that preexec_fn is not permitted as it is used internally.
+    The whole class signature is largely the same as that of the Popen constructor,
+    except that 'preexec_fn' is not permitted as it is used internally.
     All other supplied arguments are passed directly through to the Popen constructor.
 
     Parameters
     ----------
-    cmd: list/str
+    cmd: list or str
         The command which need to be executed.
 
-        `cmd' should be a sequence of program arguments or else a single string. By default,
-        the program to execute is the first item in `cmd' if `cmd' is a sequence.
+        'cmd' should be a sequence of program arguments or a single string.
+        By default, the program to be executed is the first item in `cmd' if `cmd' is a sequence.
 
         The shell argument (which defaults to False) specifies whether to use the shell as the
         program to execute. If shell is True, it is recommended to pass cmd as a string rather
@@ -37,7 +33,10 @@ class TaskRunner(threading.Thread):
         The name of the task. Best using naming method of programming languages.
 
     retry: integer
-        Try executing the cmd `retry' times until succeed, otherwise failed.
+        Try executing the cmd 'retry' times until succeed, otherwise failed.
+
+    popen_kwargs: dict
+        Arguments which is supported by subprocess.Popen.
 
     Notes
     -----
@@ -53,21 +52,21 @@ class TaskRunner(threading.Thread):
     TaskRunner.stderr
         stderr attribute of the running process.
 
-    TaskRunner.returncode
+    TaskRunner.exitcode
         Attribute which specify the exit code of this task.
 
     """
     def __init__(self, cmd, name=None, retry=1, **popen_kwargs):
-        threading.Thread.__init__(self, name=name)
+        super(__class__, self).__init__(name=name)
         self.daemon = True
+        self._m_name = name
 
         self.cmd = cmd
-        self.returncode = None
+        self.exitcode = None
         self.stdin = None
         self.stdout = None
         self.stderr = None
 
-        self._m_started = False
         self._m_stop_flag = threading.Event()
         self._m_lock = threading.Lock()
         self._m_run_process = None
@@ -75,8 +74,8 @@ class TaskRunner(threading.Thread):
         self._m_popen_kwargs = popen_kwargs
         self._m_try_num = 0
         self._m_retry_limit = retry
-        self._m_start_time = None
-        self._m_elapse_time = datetime.timedelta(0, 0, 0)
+        self._m_start_time = 0.0
+        self._m_elapsed_time = datetime.timedelta(0, 0, 0)
 
     def __del__(self):
         if self._m_run_process is not None:
@@ -91,21 +90,19 @@ class TaskRunner(threading.Thread):
 
     def run(self):
         self._m_lock.acquire()
-        if self._m_started is True:
+        if self._m_start_time > 0:
             raise RuntimeError("Instance can be started only once")
-        else:
-            self._m_started = True
-            self._m_start_time = datetime.datetime.now()
+        self._m_start_time = datetime.datetime.now().timestamp()
         self._m_lock.release()
 
         if "preexec_fn" in self._m_popen_kwargs:
-            raise ValueError("Argument `preexec_fn` is not allowed, it will be used internally.")
+            raise ValueError("Argument 'preexec_fn' is not allowed, it will be used internally.")
         self._m_popen_kwargs['preexec_fn'] = os.setsid
 
         if "close_fds" not in self._m_popen_kwargs:
             self._m_popen_kwargs["close_fds"] = True
 
-        last_returncode = None
+        last_exitcode = None
         while not self._m_stop_flag.is_set() and self._m_try_num < self._m_retry_limit:
             self._m_try_num += 1
             self._m_run_process = subprocess.Popen(self.cmd, **self._m_popen_kwargs)
@@ -116,20 +113,22 @@ class TaskRunner(threading.Thread):
             while self._m_run_process.poll() is None:
                 time.sleep(0.1)
 
-            last_returncode = self._m_run_process.poll()
-            if last_returncode == 0:
+            last_exitcode = self._m_run_process.poll()
+            if last_exitcode == 0:
                 break
+            else:
+                logging.warning("Proc '%s' exit with non-zero code '%d' on try %d/%d" % (
+                    self._m_name, last_exitcode, self._m_try_num, self._m_retry_limit))
 
-        self.returncode = last_returncode
-        self._m_elapse_time = datetime.datetime.now() - self._m_start_time
-        return self.returncode
+        self.exitcode = last_exitcode
+        self._m_elapsed_time = datetime.datetime.now().timestamp() - self._m_start_time
+        return self.exitcode
 
     def terminate(self):
         """Terminate current running process."""
         self._m_stop_flag.set()
         if self._m_run_process is not None and self._m_run_process.poll() is None:
             os.killpg(self._m_run_process.pid, signal.SIGTERM)
-        return True
 
     @property
     def info(self):
@@ -139,21 +138,18 @@ class TaskRunner(threading.Thread):
         -------
         information: dict
             A dict which contains task's information, including:
-
-                elapse_time : integer, time since task started.
-                start_time : datetime.datetime, started time of current task.
-                returncode : int, task's exit code
-                try_info : string, task's try information.
+                elapsed_time: integer, time since task started.
+                start_time: datetime.datetime, started time of current task.
+                returncode: int, task's exit code
+                try: string, task's try information.
         """
-        if self.is_alive() and self._m_start_time is not None:
-            self._m_elapse_time = datetime.datetime.now() - self._m_start_time
+        if self.is_alive() and self._m_start_time > 0:
+            self._m_elapsed_time = datetime.datetime.now().timestamp() - self._m_start_time
 
-        elapse_time = self._m_elapse_time.total_seconds()
-        elapse_time += self._m_elapse_time.microseconds / 1000000.
         return {
-            'elapse_time': elapse_time,
-            'start_time': self._m_start_time,
-            'returncode': self.returncode,
-            'try_info': "%s/%s" % (self._m_try_num, self._m_retry_limit)
+            'elapsed_time': self._m_elapsed_time,
+            'start_time': datetime.datetime.fromtimestamp(self._m_start_time),
+            'exitcode': self.exitcode,
+            'try': "%s/%s" % (self._m_try_num, self._m_retry_limit)
         }
 
