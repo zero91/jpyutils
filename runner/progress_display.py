@@ -1,4 +1,4 @@
-"""Tools for display tasks' status friendly."""
+"""Tools for display task status friendly."""
 from __future__ import division
 from __future__ import print_function
 from __future__ import absolute_import
@@ -8,36 +8,31 @@ from ..utils import terminal
 
 import collections
 import operator
-import datetime
 import sys
-import abc
 
 _TaskStatusColor = {
-    TaskStatus.DISABLED : ("Disabled", "black", None),
-    TaskStatus.WAITING  : ("Waiting",  "cyan", None),
-    TaskStatus.READY    : ("Ready",    "blue", None),
+    TaskStatus.DISABLED : ("Disabled", "black",  None),
+    TaskStatus.WAITING  : ("Waiting",  "cyan",   None),
+    TaskStatus.READY    : ("Ready",    "blue",   None),
     TaskStatus.RUNNING  : ("Running",  "yellow", None),
-    TaskStatus.DONE     : ("Done",     "green", None),
-    TaskStatus.FAILED   : ("Failed",   "red", None),
+    TaskStatus.DONE     : ("Done",     "green",  None),
+    TaskStatus.FAILED   : ("Failed",   "red",    None),
     TaskStatus.KILLED   : ("Killed",   "purple", None)
 }
 
 class TableProgressDisplay(object):
-    """Display tasks' status in a table.
+    """Display tasks status in a table.
+
+    Parameters
+    ----------
+    dependency_manager: multi_task_runner.TaskDependencyManager
+        Manage tasks' dependency relations.
+
+    task_runner_dict: dict
+        Task runner dict, key is task's name, value is as (status, runner).
 
     """
-    def __init__(self, dependency_manager, task_runner_dict, update_interval=500):
-        """Create a new instance.
-
-        Parameters
-        ----------
-        dependency_manager: multi_task_runner.TaskDependencyManager
-            Manage tasks' dependency relations.
-
-        task_runner_dict: dict
-            Task runner dict, key is task's name, value is as (status, runner).
-
-        """
+    def __init__(self, dependency_manager, task_runner_dict, update_interval=1200):
         self._m_tasks_info = dependency_manager.get_tasks_info()[1]
         self._m_tasks_list = sorted(self._m_tasks_info,
                                     key=lambda name: self._m_tasks_info[name][1])
@@ -55,34 +50,37 @@ class TableProgressDisplay(object):
             'task_name': max(map(len, self._m_tasks_info)),
             'status': 8,
             'start_time': 19, # format: YYYY-mm-dd HH:MM:SS
-            'elapse_time': 9,
-            'try_info': 5
+            'elapsed_time': 9,
+            'try': 5
         }
+        row_separator_len = 3 + sum(self._m_task_info_length.values())
+        row_separator_len += 3 * len(self._m_task_info_length) + 10
+        self._m_row_separator = '-' * row_separator_len
         self._m_display_times = 0
         self._m_update_interval = update_interval
 
-    def display(self):
-        """Display all tasks' status as a table.
+    def display(self, refresh=False):
+        """Display all tasks status as a table."""
+        if refresh:
+            self._m_display_times = 0
 
-        """
         self._m_display_times += 1
         fout = sys.stderr
         if self._m_display_times % self._m_update_interval == 1:
             if self._m_display_times > 1:
                 fout.write("\033[%dA" % (2 * len(self._m_tasks_info) + 1))
-            row_separator_len = sum(self._m_task_info_length.values()) + 3
-            row_separator_len += 3 * len(self._m_task_info_length)
-            fout.write("%s\n" % ('-' * row_separator_len))
+            fout.write("%s\n" % (self._m_row_separator))
             for task_name in self._m_tasks_list:
                 task_show_str = self.__fetch_task_str(task_name)
                 self._m_tasks_show[task_name] = task_show_str
                 fout.write("%s\n" % (task_show_str))
-                fout.write("%s\n" % ('-' * row_separator_len))
-            return
+                fout.write("%s\n" % (self._m_row_separator))
 
-        for task_name in self._m_tasks_list:
-            task_show_str = self.__fetch_task_str(task_name)
-            if task_show_str != self._m_tasks_show[task_name]:
+        else:
+            for task_name in self._m_tasks_list:
+                task_show_str = self.__fetch_task_str(task_name)
+                if task_show_str == self._m_tasks_show[task_name]:
+                    continue
                 move = (len(self._m_tasks_info) - self._m_tasks_info[task_name][1]) * 2
                 fout.write("\033[%dA\33[K%s\033[%dB\n" % (move, task_show_str, move - 1))
                 self._m_tasks_show[task_name] = task_show_str
@@ -102,7 +100,9 @@ class TableProgressDisplay(object):
 
         status_desc, font_color, bg_color = _TaskStatusColor[task_status]
         status_desc_str = terminal.tint(status_desc.ljust(self._m_task_info_length['status']),
-                                    font_color=font_color, bg_color=bg_color, highlight=highlight)
+                                        font_color=font_color,
+                                        bg_color=bg_color,
+                                        highlight=highlight)
         task_show_str_list.append('|')
         task_show_str_list.append(status_desc_str)
 
@@ -111,11 +111,11 @@ class TableProgressDisplay(object):
             task_show_str_list.append(task_info['start_time'].strftime("%Y.%m.%d %H:%M:%S"))
 
             task_show_str_list.append('|')
-            task_show_str_list.append(("%.2f" % (task_info['elapse_time'])).ljust(\
-                                                self._m_task_info_length['elapse_time']))
+            task_show_str_list.append(("%.2f" % (task_info['elapsed_time'])).ljust(\
+                                                self._m_task_info_length['elapsed_time']))
             task_show_str_list.append('|')
-            task_show_str_list.append(task_info['try_info'].ljust(
-                                                self._m_task_info_length['try_info']))
+            task_show_str_list.append(task_info['try'].ljust(
+                                                self._m_task_info_length['try']))
 
         if task_status == TaskStatus.WAITING:
             task_show_str_list.append('|')

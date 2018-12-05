@@ -87,7 +87,7 @@ class TestMultiTaskRunner(unittest.TestCase):
 
     def test_add(self):
         # add
-        scheduler = runner.MultiTaskRunner()
+        scheduler = runner.MultiTaskRunner(render_arguments={"mark": "jpyutils", "num": "2018"})
         scheduler.add(
             command = "ls -l",
             name = "test001",
@@ -97,22 +97,29 @@ class TestMultiTaskRunner(unittest.TestCase):
         )
 
         scheduler.add(
-            command = "ls -l ~",
+            command = "echo <%= mark %> + <%= num %>",
             name = "test002",
             depends="test001",
             stdout = subprocess.PIPE,
             stderr = subprocess.PIPE,
             shell=True
         )
-        self.assertEqual(scheduler.run(), 0)
-        self.assertGreater(len(scheduler.get_task_runner("test002").stdout.read()), 0)
 
+        scheduler.add(
+            command = lambda s: sum(s),
+            name = "add_sum",
+            depends = "test002",
+            args = (range(100000000),),
+            stdout = None,
+        )
+        self.assertEqual(scheduler.run("0-2", try_best=True), 0)
+        self.assertGreater(len(scheduler.get_task_runner("test002").stdout.read()), 0)
         # adds
         scheduler = runner.MultiTaskRunner(render_arguments={"mark": "jpyutils", "num": "2018"})
 
-        scheduler.adds('TaskRunner(name = "ls_<%= num %>", command = "ls",)')
+        scheduler.adds('Runner(name = "ls_<%= num %>", command = "ls",)')
         scheduler.adds(
-            'TaskRunner('
+            'Runner('
             '    name = "ls_<%=mark%>",'
             '    command = "ls",'
             '    depends = "ls_<%=num%>",'
@@ -128,11 +135,19 @@ class TestMultiTaskRunner(unittest.TestCase):
         self.assertEqual(scheduler.run(), 0)
 
     def test_run(self):
+        return
         conf_path = os.path.dirname(os.path.realpath(__file__))
         scheduler = runner.MultiTaskRunner(render_arguments={"mark": "jpyutils", "num": "2018"})
         scheduler.addf(os.path.join(conf_path, "multi_tasks.conf"))
         self.assertEqual(scheduler.run("2,3,5-7,10-11"), 0)
 
+    def test_render_arguments(self):
+        scheduler = runner.MultiTaskRunner(render_arguments={"mark": "jpyutils", "num": "2018"})
+        self.assertEqual(scheduler._render_arguments("<%= mark %>"), "jpyutils")
+        self.assertListEqual(scheduler._render_arguments(["<%= mark %>", "num = <%= num %>"]),
+                             ["jpyutils", "num = 2018"])
+        self.assertListEqual(scheduler._render_arguments([2018, "num = <%= num %>"]),
+                             [2018, "num = 2018"])
 
 if __name__ == '__main__':
     unittest.main()

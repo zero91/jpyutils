@@ -9,6 +9,7 @@ import threading
 import datetime
 import time
 import signal
+import logging
 
 class TaskRunner(threading.Thread):
     """Run a command in an independent process, and maintain the new created process in a thread.
@@ -75,7 +76,7 @@ class TaskRunner(threading.Thread):
         self._m_try_num = 0
         self._m_retry_limit = retry
         self._m_start_time = 0.0
-        self._m_elapsed_time = datetime.timedelta(0, 0, 0)
+        self._m_elapsed_time = 0.0
 
     def __del__(self):
         if self._m_run_process is not None:
@@ -146,9 +147,14 @@ class TaskRunner(threading.Thread):
         if self.is_alive() and self._m_start_time > 0:
             self._m_elapsed_time = datetime.datetime.now().timestamp() - self._m_start_time
 
+        if self._m_start_time > 0:
+            start_time = datetime.datetime.fromtimestamp(self._m_start_time)
+        else:
+            start_time = None
+
         return {
             'elapsed_time': self._m_elapsed_time,
-            'start_time': datetime.datetime.fromtimestamp(self._m_start_time),
+            'start_time': start_time,
             'exitcode': self.exitcode,
             'try': "%s/%s" % (self._m_try_num, self._m_retry_limit)
         }

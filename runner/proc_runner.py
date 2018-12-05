@@ -128,9 +128,14 @@ class ProcRunner(multiprocessing.Process):
             self._m_elapsed_time.value = \
                     datetime.datetime.now().timestamp() - self._m_start_time.value
 
+        if self._m_start_time.value > 0:
+            start_time = datetime.datetime.fromtimestamp(self._m_start_time.value),
+        else:
+            start_time = None
+
         return {
             'elapsed_time': self._m_elapsed_time.value,
-            'start_time': datetime.datetime.fromtimestamp(self._m_start_time.value),
+            'start_time': start_time,
             'exitcode': self.exitcode,
             'try': "%s/%s" % (self._m_try_num.value, self._m_retry_limit)
         }
