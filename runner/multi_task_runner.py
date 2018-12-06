@@ -305,6 +305,7 @@ class MultiTaskRunner(object):
         self._m_retry = retry
 
         self._m_dependency_manager = TaskDependencyManager()
+        self._m_open_file_list = list()
         self._m_task_runner_dict = dict()
         self._m_running_task_set = set()
         self._m_started = False
@@ -313,6 +314,10 @@ class MultiTaskRunner(object):
             self._m_displayer_class = TableProgressDisplay
         else:
             self._m_displayer_class = displayer
+
+    def __del__(self):
+        for f in self._m_open_file_list:
+            f.close()
 
     def add(self, command, name=None, depends=None, append_log=False, render=True,
                                       args=(), kwargs={}, **popen_kwargs):
@@ -376,11 +381,16 @@ class MultiTaskRunner(object):
                 if sname in popen_kwargs:
                     logging.warning("Parameter '%s' already exists in Popen parameters" % (sname))
                     continue
-                popen_kwargs[sname] = open("%s/%s.%s" % (self._m_log_path, name, sname),
-                                           'a+' if append_log is True else 'w+')
+                open_tag = 'a+' if append_log is True else 'w+'
+                popen_kwargs[sname] = open("%s/%s.%s" % (self._m_log_path, name, sname), open_tag)
+                self._m_open_file_list.append(popen_kwargs[sname])
 
         if callable(command):
-            runner = ProcRunner(command, name=name, retry=self._m_retry, args=args, kwargs=kwargs)
+            runner = ProcRunner(command, name=name, retry=self._m_retry,
+                                                    stdout=popen_kwargs.get('stdout'),
+                                                    stderr=popen_kwargs.get('stderr'),
+                                                    args=args,
+                                                    kwargs=kwargs)
         else:
             runner = TaskRunner(command, name=name, retry=self._m_retry, **popen_kwargs)
         self._m_task_runner_dict[runner.name] = [TaskStatus.WAITING, runner]

@@ -53,37 +53,62 @@ class TableProgressDisplay(object):
             'elapsed_time': 9,
             'try': 5
         }
-        row_separator_len = 3 + sum(self._m_task_info_length.values())
-        row_separator_len += 3 * len(self._m_task_info_length) + 10
+        row_separator_len = 4 + sum(self._m_task_info_length.values())
+        row_separator_len += 3 * (len(self._m_task_info_length) - 2)
         self._m_row_separator = '-' * row_separator_len
         self._m_display_times = 0
         self._m_update_interval = update_interval
+        self._m_cursor_pos = 0
+        sys.stderr.write("\33[?25l")
+
+    def __del__(self):
+        sys.stderr.write("\033[%dB\n" % (2 * len(self._m_tasks_info) + 1 - self._m_cursor_pos))
+        sys.stderr.write("\33[?25h")
 
     def display(self, refresh=False):
         """Display all tasks status as a table."""
-        if refresh:
-            self._m_display_times = 0
-
-        self._m_display_times += 1
         fout = sys.stderr
-        if self._m_display_times % self._m_update_interval == 1:
-            if self._m_display_times > 1:
-                fout.write("\033[%dA" % (2 * len(self._m_tasks_info) + 1))
-            fout.write("%s\n" % (self._m_row_separator))
+        if refresh and self._m_display_times > 0:
+            if 2 * len(self._m_tasks_info) + 1 >= self._m_cursor_pos:
+                fout.write("\033[%dB\n" % (2 * len(self._m_tasks_info) + 2 - self._m_cursor_pos))
+            self._m_display_times = 0
+            self._m_cursor_pos = 0
+
+        if self._m_display_times % self._m_update_interval == 0:
+            if self._m_cursor_pos > 0:
+                fout.write("\033[%dA" % (self._m_cursor_pos))
+            fout.write("\033[K%s\n" % (self._m_row_separator))
             for task_name in self._m_tasks_list:
                 task_show_str = self.__fetch_task_str(task_name)
                 self._m_tasks_show[task_name] = task_show_str
-                fout.write("%s\n" % (task_show_str))
-                fout.write("%s\n" % (self._m_row_separator))
-
+                fout.write("\033[K%s\n\033[K%s\n" % (task_show_str, self._m_row_separator))
+            fout.write("\033[%dA" % (2 * len(self._m_tasks_info) + 1 - self._m_cursor_pos))
         else:
             for task_name in self._m_tasks_list:
                 task_show_str = self.__fetch_task_str(task_name)
                 if task_show_str == self._m_tasks_show[task_name]:
                     continue
-                move = (len(self._m_tasks_info) - self._m_tasks_info[task_name][1]) * 2
-                fout.write("\033[%dA\33[K%s\033[%dB\n" % (move, task_show_str, move - 1))
+                move = self._m_tasks_info[task_name][1] * 2 + 1 - self._m_cursor_pos
+                if move == 0:
+                    fout.write("\033[K%s\033[%dA\n" % (task_show_str, move + 1))
+                else:
+                    fout.write("\033[%dB\033[K%s\033[%dA\n" % (move, task_show_str, move + 1))
                 self._m_tasks_show[task_name] = task_show_str
+
+            for task_name in self._m_tasks_list:
+                task_status = self._m_task_runner_dict[task_name][0]
+                if task_status not in [TaskStatus.DISABLED,
+                                       TaskStatus.DONE,
+                                       TaskStatus.FAILED,
+                                       TaskStatus.KILLED]:
+                    new_cursor_pos = self._m_tasks_info[task_name][1] * 2 + 1
+                    if new_cursor_pos != self._m_cursor_pos:
+                        if new_cursor_pos - self._m_cursor_pos > 1:
+                            fout.write("\033[%dB" % (new_cursor_pos - self._m_cursor_pos - 1))
+                        fout.write("\n")
+                    self._m_cursor_pos = new_cursor_pos
+                    break
+        self._m_display_times += 1
 
     def __fetch_task_str(self, task_name):
         task_status = self._m_task_runner_dict[task_name][0]

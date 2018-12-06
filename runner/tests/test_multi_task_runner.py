@@ -106,14 +106,13 @@ class TestMultiTaskRunner(unittest.TestCase):
         )
 
         scheduler.add(
-            command = lambda s: sum(s),
+            command = lambda s: print(sum(s)),
             name = "add_sum",
             depends = "test002",
-            args = (range(100000000),),
-            stdout = None,
+            args = (range(1000000),)
         )
         self.assertEqual(scheduler.run("0-2", try_best=True), 0)
-        self.assertGreater(len(scheduler.get_task_runner("test002").stdout.read()), 0)
+
         # adds
         scheduler = runner.MultiTaskRunner(render_arguments={"mark": "jpyutils", "num": "2018"})
 
@@ -135,7 +134,6 @@ class TestMultiTaskRunner(unittest.TestCase):
         self.assertEqual(scheduler.run(), 0)
 
     def test_run(self):
-        return
         conf_path = os.path.dirname(os.path.realpath(__file__))
         scheduler = runner.MultiTaskRunner(render_arguments={"mark": "jpyutils", "num": "2018"})
         scheduler.addf(os.path.join(conf_path, "multi_tasks.conf"))
