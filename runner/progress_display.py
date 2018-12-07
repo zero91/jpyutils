@@ -62,15 +62,16 @@ class TableProgressDisplay(object):
         sys.stderr.write("\33[?25l")
 
     def __del__(self):
-        sys.stderr.write("\033[%dB\n" % (2 * len(self._m_tasks_info) + 1 - self._m_cursor_pos))
+        if self._m_display_times > 0:
+            sys.stderr.write("\033[%dB" % (2 * len(self._m_tasks_info) + 1 - self._m_cursor_pos))
         sys.stderr.write("\33[?25h")
 
     def display(self, refresh=False):
         """Display all tasks status as a table."""
         fout = sys.stderr
         if refresh and self._m_display_times > 0:
-            if 2 * len(self._m_tasks_info) + 1 >= self._m_cursor_pos:
-                fout.write("\033[%dB\n" % (2 * len(self._m_tasks_info) + 2 - self._m_cursor_pos))
+            if 2 * len(self._m_tasks_info) + 1 > self._m_cursor_pos:
+                fout.write("\033[%dB\n" % (2 * len(self._m_tasks_info) + 1 - self._m_cursor_pos))
             self._m_display_times = 0
             self._m_cursor_pos = 0
 

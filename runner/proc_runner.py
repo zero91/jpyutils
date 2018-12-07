@@ -129,7 +129,7 @@ class ProcRunner(multiprocessing.Process):
                     datetime.datetime.now().timestamp() - self._m_start_time.value
 
         if self._m_start_time.value > 0:
-            start_time = datetime.datetime.fromtimestamp(self._m_start_time.value),
+            start_time = datetime.datetime.fromtimestamp(self._m_start_time.value)
         else:
             start_time = None
 
