@@ -4,7 +4,6 @@ import subprocess
 import os
 
 from jpyutils import runner
-from jpyutils import utils
 
 class TestTaskDependencyManager(unittest.TestCase):
     def setUp(self):
@@ -80,7 +79,7 @@ class TestTaskDependencyManager(unittest.TestCase):
 
 class TestMultiTaskRunner(unittest.TestCase):
     def setUp(self):
-        utils.utilities.get_logger()
+        pass
 
     def tearDown(self):
         pass

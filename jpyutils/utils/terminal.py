@@ -3,9 +3,6 @@
 from __future__ import division
 from __future__ import print_function
 from __future__ import absolute_import
-import os
-import re
-import sys
 
 def tint(s, font_color="red", bg_color=None, highlight=False):
     """Set tint for a string.
