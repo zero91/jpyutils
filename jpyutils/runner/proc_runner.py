@@ -7,6 +7,7 @@ import sys
 import multiprocessing
 import logging
 import datetime
+import time
 
 class ProcRunner(multiprocessing.Process):
     """Run a function in an independent process.
@@ -21,6 +22,9 @@ class ProcRunner(multiprocessing.Process):
 
     retry: integer
         Try executing the target function 'retry' times until succeed, otherwise failed.
+
+    interval: float
+        Interval time between each try.
 
     stdin: file
         Input stream.
@@ -52,7 +56,7 @@ class ProcRunner(multiprocessing.Process):
         Attribute which specify the exit code of the target.
 
     """
-    def __init__(self, target, name=None, retry=1,
+    def __init__(self, target, name=None, retry=1, interval=5,
                                stdin=None, stdout=None, stderr=None, args=(), kwargs={}):
         super(__class__, self).__init__(target=target, name=name, args=args, kwargs=kwargs)
         self.daemon = True
@@ -76,6 +80,7 @@ class ProcRunner(multiprocessing.Process):
         self._m_lock = multiprocessing.Lock()
         self._m_try_num = multiprocessing.Value('i', 0)
         self._m_retry_limit = retry
+        self._m_retry_interval = interval
         self._m_start_time = multiprocessing.Value('d', 0)
         self._m_elapsed_time = multiprocessing.Value('d', 0)
 
@@ -91,6 +96,8 @@ class ProcRunner(multiprocessing.Process):
         sys.stderr = self.stderr
 
         while self._m_try_num.value < self._m_retry_limit:
+            if self._m_try_num.value > 0:
+                time.sleep(self._m_retry_interval)
             self._m_try_num.value += 1
             last_exitcode = 0
             try:

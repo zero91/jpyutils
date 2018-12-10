@@ -282,12 +282,15 @@ class MultiTaskRunner(object):
     retry: integer
         Try executing each task retry times until succeed.
 
+    interval: float
+        Interval time between each try.
+
     displayer: class
         Class which can display tasks information.
 
     """
     def __init__(self, log_path=None, render_arguments=None,
-                       parallel_degree=-1, retry=1, displayer=None):
+                       parallel_degree=-1, retry=1, interval=5, displayer=None):
         if log_path is not None:
             self._m_log_path = os.path.realpath(log_path)
         else:
@@ -303,6 +306,7 @@ class MultiTaskRunner(object):
 
         self._m_parallel_degree = parallel_degree
         self._m_retry = retry
+        self._m_interval = interval
 
         self._m_dependency_manager = TaskDependencyManager()
         self._m_open_file_list = list()
@@ -387,12 +391,15 @@ class MultiTaskRunner(object):
 
         if callable(command):
             runner = ProcRunner(command, name=name, retry=self._m_retry,
+                                                    interval=self._m_interval,
                                                     stdout=popen_kwargs.get('stdout'),
                                                     stderr=popen_kwargs.get('stderr'),
                                                     args=args,
                                                     kwargs=kwargs)
         else:
-            runner = TaskRunner(command, name=name, retry=self._m_retry, **popen_kwargs)
+            runner = TaskRunner(command, name=name, retry=self._m_retry,
+                                                    interval=self._m_interval,
+                                                    **popen_kwargs)
         self._m_task_runner_dict[runner.name] = [TaskStatus.WAITING, runner]
         self._m_dependency_manager.add_dependency(runner.name, depends)
         return self

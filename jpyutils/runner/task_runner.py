@@ -36,6 +36,9 @@ class TaskRunner(threading.Thread):
     retry: integer
         Try executing the cmd 'retry' times until succeed, otherwise failed.
 
+    interval: float
+        Interval time between each try.
+
     popen_kwargs: dict
         Arguments which is supported by subprocess.Popen.
 
@@ -57,7 +60,7 @@ class TaskRunner(threading.Thread):
         Attribute which specify the exit code of this task.
 
     """
-    def __init__(self, cmd, name=None, retry=1, **popen_kwargs):
+    def __init__(self, cmd, name=None, retry=1, interval=5, **popen_kwargs):
         super(__class__, self).__init__(name=name)
         self.daemon = True
         self._m_name = name
@@ -75,6 +78,7 @@ class TaskRunner(threading.Thread):
         self._m_popen_kwargs = popen_kwargs
         self._m_try_num = 0
         self._m_retry_limit = retry
+        self._m_retry_interval = interval
         self._m_start_time = 0.0
         self._m_elapsed_time = 0.0
 
@@ -105,6 +109,8 @@ class TaskRunner(threading.Thread):
 
         last_exitcode = None
         while not self._m_stop_flag.is_set() and self._m_try_num < self._m_retry_limit:
+            if self._m_try_num > 0:
+                time.sleep(self._m_retry_interval)
             self._m_try_num += 1
             self._m_run_process = subprocess.Popen(self.cmd, **self._m_popen_kwargs)
 
