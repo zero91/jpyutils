@@ -5,11 +5,9 @@ Collections of small functions.
 
 from . import random
 from . import utilities
-from . import netdata
 from . import monitor
-from . import terminal
 
-__all__ = ["random", "utilities", "netdata", "monitor", "terminal"]
+__all__ = ["random", "utilities", "monitor"]
 
 """
 from . import check

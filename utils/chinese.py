@@ -45,6 +45,11 @@ def is_chinese_char(uchar, encoding='utf-8'):
         return False
 
  
+# def Chinese_word_extraction(content_raw):
+# 	chinese_pattern = u"([\u4e00-\u9fa5]+)"
+# 	chi_pattern = re.compile(chinese_pattern)
+# 	re_data = chi_pattern.findall(content_raw)
+# 	content_clean  = ' '.join(re_data)
 def contains_chinese(cstring, encoding='utf-8'):
     """Return True is cstring contains chinese chars, otherwise return False.
 
@@ -66,7 +71,7 @@ def contains_chinese(cstring, encoding='utf-8'):
         cstring = cstring.decode(encoding)
 
     for cchar in cstring:
-        if is_chinese_char(cchar):
+        if is_chinese_char(cchar, encoding):
             return True
     return False
 
