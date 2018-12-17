@@ -3,7 +3,8 @@ Collections of small functions.
 ===============================
 """
 
-from . import terminal
 from .deprecation import deprecated
+from . import terminal
+from . import disk
 
-__all__ = ["terminal", "deprecated"]
+__all__ = ["deprecated", "terminal", "disk"]
