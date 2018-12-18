@@ -4,6 +4,7 @@ from __future__ import absolute_import
 import unittest
 import os
 import shutil
+import hashlib
 
 from jpyutils import utils
 
@@ -73,16 +74,19 @@ class TestDisk(unittest.TestCase):
         os.system("man ls > 6.1.txt")
         os.system("man cp > 6.2.txt")
         os.makedirs("case_6")
-        os.system("touch case_6/6.1.txt")
-        with self.assertRaises(IOError):
-            utils.disk.move_data(["6.1.txt", "6.2.txt"], "case_6")
-        utils.disk.move_data(["6.1.txt"], "case_6", overwrite=True)
+        os.system("man ls > case_6/6.1.txt")
+        utils.disk.move_data(["6.1.txt", "6.2.txt"], "case_6")
         self.assertFalse(os.path.exists("6.1.txt"))
         self.assertFalse(os.path.exists("6.2.txt"))
         self.assertTrue(os.path.exists("case_6/6.1.txt"))
         self.assertTrue(os.path.exists("case_6/6.2.txt"))
         shutil.rmtree("case_6")
 
+    def test_md5(self):
+        with open(__file__, 'rb') as fin:
+            self.assertEqual(hashlib.md5(fin.read()).hexdigest(), utils.disk.md5(__file__))
+
 
 if __name__ == "__main__":
     unittest.main()
+
