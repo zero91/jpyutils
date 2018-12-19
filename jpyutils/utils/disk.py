@@ -8,7 +8,7 @@ def move_data(src_data_files, dest_path, overwrite=False):
 
     Parameters
     ----------
-    src_data_files: list
+    src_data_files: list or str
         A list of data path in string.
 
     dest_path: str
@@ -30,6 +30,10 @@ def move_data(src_data_files, dest_path, overwrite=False):
     if len(src_data_files) == 0:
         return src_data_files
 
+    if isinstance(src_data_files, str):
+        src_data_files = [src_data_files]
+
+    dest_path = os.path.realpath(dest_path)
     if os.path.isfile(dest_path):
         if len(src_data_files) == 1:
             if overwrite:
@@ -39,6 +43,7 @@ def move_data(src_data_files, dest_path, overwrite=False):
             raise IOError("Need to move multiple files, but destination is an existed file")
     else:
         if not os.path.exists(dest_path) and len(src_data_files) == 1:
+            os.makedirs(os.path.dirname(dest_path), exist_ok=True)
             shutil.move(src_data_files[0], dest_path)
             return dest_path
 
