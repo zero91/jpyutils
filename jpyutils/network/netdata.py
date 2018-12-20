@@ -52,7 +52,7 @@ def parse_url(url):
     return protocol, main_url, params
 
 
-def download(dest_path, uri, params=None, overwrite=False):
+def download(dest_path, uri, params=None, overwrite=False, protocol_downloader={}):
     """Download data. Supported type of downloading:
         1) http
         2) https
@@ -74,6 +74,10 @@ def download(dest_path, uri, params=None, overwrite=False):
     overwrite: boolean
         Whether to overwrite the existed data or not.
 
+    protocol_downloader: dict
+        Protocol to downloadder mapper.
+        Each downloader mush have signature (dest_path, url, params, overwrite).
+
     Returns
     -------
     data_files: list or string
@@ -92,6 +96,7 @@ def download(dest_path, uri, params=None, overwrite=False):
         'https': http_download,
         'pip': pip_download,
     }
+    _protocol_downloader.update(protocol_downloader)
     if protocol not in _protocol_downloader:
         raise KeyError("Unsupported protocol %s" % protocol)
 
