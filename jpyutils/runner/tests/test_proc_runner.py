@@ -57,5 +57,19 @@ class TestProcRunner(unittest.TestCase):
         self.assertTrue("exitcode" in proc_3.info)
         self.assertTrue("try" in proc_3.info)
 
+    def test_proc_return_value(self):
+        def func(a, b):
+            return "%d + %d = %d" % (a, b, a + b)
+
+        proc = runner.ProcRunner(
+            target=func,
+            name="proc",
+            args=(1, 3),
+            retry=3,
+        )
+        proc.start()
+        proc.join()
+        self.assertEqual(proc.info['return'], b'1 + 3 = 4')
+
 if __name__ == "__main__":
     unittest.main()

@@ -445,8 +445,18 @@ class MultiTaskRunner(object):
         with open(tasks_fname, mode='r', encoding=encoding) as ftask:
             return self.adds(ftask.read())
 
-    def lists(self):
+    def lists(self, display=True):
         """List all tasks.
+
+        Parameters
+        ----------
+        display: boolean
+            Set True if you want to display the tasks info on the screen.
+
+        Returns
+        -------
+        tasks_list: list
+            The list of tasks in order of running id.
 
         Raises
         ------
@@ -455,7 +465,15 @@ class MultiTaskRunner(object):
         """
         if not self._m_dependency_manager.is_topological():
             raise ValueError("Depenency relations of tasks is not topological")
-        self._m_displayer_class(self._m_dependency_manager, self._m_task_runner_dict).display()
+
+        if display is True:
+            self._m_displayer_class(
+                self._m_dependency_manager,
+                self._m_task_runner_dict
+            ).display()
+
+        tasks_info = self._m_dependency_manager.get_tasks_info()[1]
+        return sorted(tasks_info, key=lambda name: tasks_info[name][1])
 
     def run(self, tasks=None, verbose=False, try_best=False):
         """Run tasks.

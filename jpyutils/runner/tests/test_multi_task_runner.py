@@ -138,6 +138,13 @@ class TestMultiTaskRunner(unittest.TestCase):
         scheduler.addf(os.path.join(conf_path, "multi_tasks.conf"))
         self.assertEqual(scheduler.run("2,3,5-7,10-11"), 0)
 
+    def test_lists(self):
+        # addf
+        scheduler = runner.MultiTaskRunner(render_arguments={"mark": "jpyutils", "num": "2018"})
+        conf_path = os.path.dirname(os.path.realpath(__file__))
+        scheduler.addf(os.path.join(conf_path, "multi_tasks.conf"))
+        print(scheduler.lists(display=False))
+
     def test_render_arguments(self):
         scheduler = runner.MultiTaskRunner(render_arguments={"mark": "jpyutils", "num": "2018"})
         self.assertEqual(scheduler._render_arguments("<%= mark %>"), "jpyutils")

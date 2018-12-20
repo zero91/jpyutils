@@ -8,6 +8,7 @@ import multiprocessing
 import logging
 import datetime
 import time
+import ctypes
 
 class ProcRunner(multiprocessing.Process):
     """Run a function in an independent process.
@@ -83,6 +84,7 @@ class ProcRunner(multiprocessing.Process):
         self._m_retry_interval = interval
         self._m_start_time = multiprocessing.Value('d', 0)
         self._m_elapsed_time = multiprocessing.Value('d', 0)
+        self._m_return_value = multiprocessing.sharedctypes.Array(ctypes.c_char, 4096)
 
     def run(self):
         self._m_lock.acquire()
@@ -95,13 +97,15 @@ class ProcRunner(multiprocessing.Process):
         sys.stdout = self.stdout
         sys.stderr = self.stderr
 
+        target_ret_value = None
         while self._m_try_num.value < self._m_retry_limit:
             if self._m_try_num.value > 0:
                 time.sleep(self._m_retry_interval)
             self._m_try_num.value += 1
             last_exitcode = 0
             try:
-                super(__class__, self).run()
+                if self._target:
+                    target_ret_value = self._target(*self._args, **self._kwargs)
                 break
             except SystemExit as se:
                 if se.code == 0:
@@ -114,6 +118,16 @@ class ProcRunner(multiprocessing.Process):
                         self._m_name, e, self._m_try_num.value, self._m_retry_limit))
                 last_exitcode = 1
 
+        try:
+            if target_ret_value is None:
+                self._m_return_value.value = b''
+            elif isinstance(target_ret_value, bytes):
+                self._m_return_value.value = target_ret_value
+            else:
+                self._m_return_value.value = str(target_ret_value).encode("utf-8")
+        except Exception as e:
+            logging.warning("ProcRunner receive returned value failed, got exception '%s'" %(e))
+            self._m_return_value.value = b''
         self._m_elapsed_time.value = datetime.datetime.now().timestamp() - self._m_start_time.value
         exit(last_exitcode)
 
@@ -129,11 +143,17 @@ class ProcRunner(multiprocessing.Process):
                 elapsed_time : integer, time since task started.
                 start_time : datetime.datetime, started time of current task.
                 exitcode : int, task's exit code
+                return: bytes, task's return value in bytes
                 try: string, task's try information.
         """
         if self.is_alive() and self._m_start_time.value > 0:
             self._m_elapsed_time.value = \
                     datetime.datetime.now().timestamp() - self._m_start_time.value
+
+        if self.is_alive():
+            return_value = None
+        else:
+            return_value = self._m_return_value.value
 
         if self._m_start_time.value > 0:
             start_time = datetime.datetime.fromtimestamp(self._m_start_time.value)
@@ -144,6 +164,7 @@ class ProcRunner(multiprocessing.Process):
             'elapsed_time': self._m_elapsed_time.value,
             'start_time': start_time,
             'exitcode': self.exitcode,
+            'return': return_value,
             'try': "%s/%s" % (self._m_try_num.value, self._m_retry_limit)
         }
 
