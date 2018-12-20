@@ -199,14 +199,13 @@ def http_download(dest_path, url, params=None, overwrite=False, chunk_size=1024 
         return None
 
     remote_fname = os.path.basename(urllib.parse.urlparse(url).path)
+    remote_fsize = int(r.headers['Content-Length'])
     if not overwrite:
-        if os.path.isfile(dest_path) and \
-                os.path.getsize(dest_path) == int(r.headers['Content-Length']):
+        if os.path.isfile(dest_path) and os.path.getsize(dest_path) == remote_fsize:
             return dest_path
 
         dir_save_fname = os.path.join(dest_path, remote_fname)
-        if os.path.isfile(dir_save_fname) and \
-                os.path.getsize(dir_save_fname) == int(r.headers['Content-Length']):
+        if os.path.isfile(dir_save_fname) and os.path.getsize(dir_save_fname) == remote_fsize:
             return dir_save_fname
 
     if os.path.isdir(dest_path):
@@ -216,15 +215,14 @@ def http_download(dest_path, url, params=None, overwrite=False, chunk_size=1024 
         fout = open(dest_path, 'wb')
 
     size = 0
-    logging.info("Request %s, size %.2fMB, download 0.00MB" % (
-            url, r.headers['Content-Length'] / 1024. ** 2))
+    logging.info("Request %s, size %.2fMB, download 0.00MB" % (url, remote_fsize / 1024. ** 2))
     for chunk in r.iter_content(chunk_size=chunk_size):
         if chunk: # filter out keep-alive new chunks
             fout.write(chunk)
             fout.flush()
             size += len(chunk)
             logging.info("Request %s, size %.2fMB, download %.2fMB" % (
-                    url, r.headers['Content-Length'] / 1024. ** 2, size / 1024. ** 2))
+                    url, remote_fsize / 1024. ** 2, size / 1024. ** 2))
     fout.close()
     return fout.name
 
