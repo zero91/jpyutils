@@ -216,13 +216,15 @@ def http_download(dest_path, url, params=None, overwrite=False, chunk_size=1024 
         fout = open(dest_path, 'wb')
 
     size = 0
-    logging.info("Request %s, download %.2fMB" % (url, 0))
+    logging.info("Request %s, size %.2fMB, download 0.00MB" % (
+            url, r.headers['Content-Length'] / 1024. ** 2))
     for chunk in r.iter_content(chunk_size=chunk_size):
         if chunk: # filter out keep-alive new chunks
             fout.write(chunk)
             fout.flush()
             size += len(chunk)
-            logging.info("Request %s, download %.2fMB" % (url, size / 1024. ** 2))
+            logging.info("Request %s, size %.2fMB, download %.2fMB" % (
+                    url, r.headers['Content-Length'] / 1024. ** 2, size / 1024. ** 2))
     fout.close()
     return fout.name
 

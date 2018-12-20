@@ -38,6 +38,8 @@ def move_data(src_data_files, dest_path, overwrite=False):
         if len(src_data_files) == 1:
             if overwrite:
                 shutil.move(src_data_files[0], dest_path)
+            else:
+                logging.info("Using old data file '%s'" % (dest_path))
             return dest_path
         else:
             raise IOError("Need to move multiple files, but destination is an existed file")
