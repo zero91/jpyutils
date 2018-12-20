@@ -18,7 +18,7 @@ from .. import runner
 from .. import utils
 
 
-def _parse_url(url):
+def parse_url(url):
     """Parse url.
 
     Parameters
@@ -80,7 +80,7 @@ def download(dest_path, uri, params=None, overwrite=False):
         If there is only one path, return a string. Otherwise, return a list.
 
     """
-    protocol, url, existed_params = _parse_url(uri)
+    protocol, url, existed_params = parse_url(uri)
     if params is None:
         params = dict()
     else:
