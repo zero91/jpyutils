@@ -21,6 +21,6 @@ def random_str(size, chars=string.ascii_letters, sep=''):
         The randomly generated string of length `size`.
 
     """
-    if not isinstance(chars, str):
-        raise TypeError("Parameter `chars` is not a str object")
+    if not isinstance(chars, (str, tuple, list)):
+        raise TypeError("Parameter `chars` is not a seq object")
     return sep.join([random.choice(chars) for i in range(size)])
