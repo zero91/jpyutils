@@ -9,6 +9,9 @@ setup(
     packages=find_packages(include=["jpyutils*"]),
     url="https://github.com/zero91/jpyutils",
     python_requires='>=3.6',
+    install_requires=[
+        "requests",
+    ],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)",

@@ -33,6 +33,9 @@ class TableProgressDisplay(object):
 
     """
     def __init__(self, dependency_manager, task_runner_dict, update_interval=1200):
+        if len(task_runner_dict) == 0:
+            raise ValueError("There is no any task, please check")
+
         self._m_tasks_info = dependency_manager.get_tasks_info()[1]
         self._m_tasks_list = sorted(self._m_tasks_info,
                                     key=lambda name: self._m_tasks_info[name][1])
@@ -62,7 +65,7 @@ class TableProgressDisplay(object):
         sys.stderr.write("\33[?25l")
 
     def __del__(self):
-        if self._m_display_times > 0:
+        if hasattr(self, "_m_display_times") and self._m_display_times > 0:
             sys.stderr.write("\033[%dB" % (2 * len(self._m_tasks_info) + 1 - self._m_cursor_pos))
         sys.stderr.write("\33[?25h")
 
