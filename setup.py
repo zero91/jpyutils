@@ -8,7 +8,7 @@ setup(
     author_email='jianzhang9102@gmail.com',
     packages=find_packages(include=["jpyutils*"]),
     url="https://github.com/zero91/jpyutils",
-    python_requires='>=3.6',
+    python_requires='>=3.5',
     install_requires=[
         "requests",
     ],
