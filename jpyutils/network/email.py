@@ -19,6 +19,7 @@ _email_server = {
         '126.com': ('smtp.126.com', (465,)), #25, 994
         'sina.com': ('smtp.sina.com', (465,)),
         'sohu.com': ('smtp.sohu.com', (465,)),
+        'jiehuozhe.com': ('smtp.exmail.qq.com', (465,)),
     },
 }
 
