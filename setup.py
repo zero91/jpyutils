@@ -10,7 +10,7 @@ setup(
     url="https://github.com/zero91/jpyutils",
     python_requires='>=3.5',
     install_requires=[
-        "requests",
+        "requests>=2.20.0",
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
