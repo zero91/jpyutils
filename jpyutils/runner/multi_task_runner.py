@@ -394,14 +394,16 @@ class MultiTaskRunner(object):
                 self._m_open_file_list.append(popen_kwargs[sname])
 
         if callable(command):
-            runner = ProcRunner(command, name=name, retry=self._m_retry,
+            runner = ProcRunner(command, name=name, daemon=daemon,
+                                                    retry=self._m_retry,
                                                     interval=self._m_interval,
                                                     stdout=popen_kwargs.get('stdout'),
                                                     stderr=popen_kwargs.get('stderr'),
                                                     args=args,
                                                     kwargs=kwargs)
         else:
-            runner = TaskRunner(command, name=name, retry=self._m_retry,
+            runner = TaskRunner(command, name=name, daemon=daemon,
+                                                    retry=self._m_retry,
                                                     interval=self._m_interval,
                                                     **popen_kwargs)
         self._m_task_runner_dict[runner.name] = [TaskStatus.WAITING, runner]
