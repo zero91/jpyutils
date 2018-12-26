@@ -27,6 +27,9 @@ class ProcRunner(multiprocessing.Process):
     interval: float
         Interval time between each try.
 
+    daemon: boolean
+        A boolean value indicating whether this runner is a daemon process (True) or not (False).
+
     stdin: file
         Input stream.
 
@@ -57,10 +60,10 @@ class ProcRunner(multiprocessing.Process):
         Attribute which specify the exit code of the target.
 
     """
-    def __init__(self, target, name=None, retry=1, interval=5,
+    def __init__(self, target, name=None, retry=1, interval=5, daemon=True,
                                stdin=None, stdout=None, stderr=None, args=(), kwargs={}):
         super(__class__, self).__init__(target=target, name=name, args=args, kwargs=kwargs)
-        self.daemon = True
+        self.daemon = daemon
         self._m_name = name
 
         if stdin is None:

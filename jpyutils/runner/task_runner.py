@@ -39,6 +39,9 @@ class TaskRunner(threading.Thread):
     interval: float
         Interval time between each try.
 
+    daemon: boolean
+        A boolean value indicating whether this runner is a daemon process (True) or not (False).
+
     popen_kwargs: dict
         Arguments which is supported by subprocess.Popen.
 
@@ -60,9 +63,9 @@ class TaskRunner(threading.Thread):
         Attribute which specify the exit code of this task.
 
     """
-    def __init__(self, cmd, name=None, retry=1, interval=5, **popen_kwargs):
+    def __init__(self, cmd, name=None, retry=1, interval=5, daemon=True, **popen_kwargs):
         super(__class__, self).__init__(name=name)
-        self.daemon = True
+        self.daemon = daemon
         self._m_name = name
 
         self.cmd = cmd
