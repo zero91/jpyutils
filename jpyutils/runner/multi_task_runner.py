@@ -557,7 +557,7 @@ class MultiTaskRunner(object):
                     failed_task_num += 1
                     if not try_best:
                         self.terminate()
-                        displayer.display(refresh=True)
+                        self.lists()
                         logging.critical("Task '{0}' failed, exit code {1}\n".format(
                                                                 task_name, exitcode))
                         return exitcode
