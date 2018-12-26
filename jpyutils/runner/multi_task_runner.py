@@ -323,7 +323,7 @@ class MultiTaskRunner(object):
         for f in self._m_open_file_list:
             f.close()
 
-    def add(self, command, name=None, depends=None, append_log=False, render=True,
+    def add(self, command, name=None, daemon=True, depends=None, append_log=False, render=True,
                                       args=(), kwargs={}, **popen_kwargs):
         """Add a new task.
 
@@ -335,6 +335,10 @@ class MultiTaskRunner(object):
         name: str
             The name of the task. Best using naming method of programming languages,
             for it may be used to create log files on disk.
+
+        daemon: boolean
+            A boolean value indicating whether this runner
+            is a daemon process (True) or not (False).
 
         depends: str, list, set or dict
             List of depended jobs.  If this is a string,
