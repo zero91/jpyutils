@@ -127,29 +127,6 @@ def read_zip(zipfname, filelist=None, merge=False, encoding='utf-8', sep='\n'):
     return contents
 
 
-def is_fresh_file(fname, days=1):
-    """Address the freshness of a file.
-
-    Parameters
-    ---------
-    fname: str
-        File's name.
-
-    days: float
-        Maximum days before current time. The argument may be a floating point number
-        for subday precision.
-
-    Returns
-    -------
-    is_fresh: boolean
-        True if the file is fresh, otherwise False.
-
-    """
-    if os.path.exists(fname) and (time.time() - os.path.getmtime(fname)) < days * 3600 * 24:
-        return True
-    return False
-
-
 def get_path_create_time(path, time_format="%Y%m%d_%H%M%S"):
     """Get create time of a path.
 

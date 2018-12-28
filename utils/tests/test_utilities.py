@@ -37,11 +37,6 @@ class TestUtilities(unittest.TestCase):
         self.assertGreater(len(utils.utilities.read_zip(self.__random_dir, merge=True)), 10000)
         os.remove(self.__random_dir)
 
-    def _test_is_fresh_file(self):
-        os.system("touch " + __file__)
-        self.assertTrue(utils.utilities.is_fresh_file(__file__))
-        self.assertFalse(utils.utilities.is_fresh_file(__file__, 0))
-
     def test_get_path_create_time(self):
         ctime = utils.utilities.get_path_create_time(os.path.dirname(os.path.realpath(__file__)))
         self.assertEqual(len(ctime), 15)

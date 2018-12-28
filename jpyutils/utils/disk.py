@@ -2,6 +2,7 @@ import os
 import shutil
 import logging
 import hashlib
+import time
 
 def move_data(src_data_files, dest_path, overwrite=False):
     """Move list of data file to destination path.
@@ -89,4 +90,27 @@ def md5(fname):
         for chunk in iter(lambda: fin.read(4096), b""):
             hash_md5.update(chunk)
     return hash_md5.hexdigest()
+
+
+def is_fresh(path, days=1):
+    """Address the freshness of a path.
+
+    Parameters
+    ---------
+    path: str
+        The path of the file or directory.
+
+    days: float
+        Should be created at maximum days before current time.
+        The argument may be a floating point number for subday precision.
+
+    Returns
+    -------
+    is_fresh: boolean
+        True if the path is fresh, otherwise False.
+
+    """
+    if os.path.exists(path) and (time.time() - os.path.getmtime(path)) < days * 3600 * 24:
+        return True
+    return False
 

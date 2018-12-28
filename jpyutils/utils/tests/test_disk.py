@@ -86,6 +86,11 @@ class TestDisk(unittest.TestCase):
         with open(__file__, 'rb') as fin:
             self.assertEqual(hashlib.md5(fin.read()).hexdigest(), utils.disk.md5(__file__))
 
+    def test_is_fresh(self):
+        os.system("touch " + __file__)
+        self.assertTrue(utils.disk.is_fresh(__file__))
+        self.assertFalse(utils.disk.is_fresh(__file__, 0))
+
 
 if __name__ == "__main__":
     unittest.main()
