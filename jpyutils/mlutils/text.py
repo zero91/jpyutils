@@ -1,7 +1,3 @@
-from __future__ import division
-from __future__ import print_function
-from __future__ import absolute_import
-
 import operator
 import collections
 import itertools
@@ -63,7 +59,7 @@ def build_dict(sentences, extra_dict=None, min_freq=0):
     return word_cnt, word2id, id2word
 
 
-def text2array(sentences, word2id, maxlen=None, beg=None, end=None, unknown=None, padding=None):
+def text2array(sentences, word2id, padding, unknown=None, beg=None, end=None, maxlen=None):
     """Convert a text into a two-dimensional array.
 
     Parameters
@@ -74,8 +70,14 @@ def text2array(sentences, word2id, maxlen=None, beg=None, end=None, unknown=None
     word2id: dict
         Mapping dictionary for word to id. Set to None if you want to use the identity mapping.
 
-    maxlen: integer
-        Maximum length of each sentences.
+    padding: integer
+        Sentences which length is less than 'maxlen',
+        should be padded with 'padding's to fullfill the length requirement.
+
+    unknown: integer
+        Words in the sentences that does not exist in the word dictionary,
+        should be set to 'unknown' integer.
+        Set to None if you want to skip the unknown words.
 
     beg: integer
         Sentry for begining of a sentence.
@@ -85,14 +87,8 @@ def text2array(sentences, word2id, maxlen=None, beg=None, end=None, unknown=None
         Sentry for ending of a sentence.
         Set to None if you don't want to use it.
 
-    unknown: integer
-        Words in the sentences that does not exist in the word dictionary,
-        should be set to 'unknown' integer.
-        Set to None if you want to skip the unknown words.
-
-    padding: integer
-        Sentences which length is less than 'maxlen',
-        should be padded with 'padding's to fullfill the length requirement.
+    maxlen: integer
+        Maximum length of each sentences.
 
     Returns
     -------
@@ -185,7 +181,7 @@ def mask3d(values, sentence_sizes, mask_value, axis=2):
 
     """
     if axis != 1 and axis != 2:
-        raise ValueError("'axis' must be equal to 1 or 2")
+        raise ValueError("'axis' must be 1 or 2")
 
     if axis == 1:
         values = tf.transpose(values, [0, 2, 1])

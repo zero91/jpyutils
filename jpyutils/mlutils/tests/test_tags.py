@@ -1,10 +1,6 @@
-from __future__ import division
-from __future__ import print_function
-from __future__ import absolute_import
-
 import unittest
 import random
-from jpyutils.mltools import utils
+import jpyutils.mlutils as utils
 
 class TestTags(unittest.TestCase):
     def setUp(self):

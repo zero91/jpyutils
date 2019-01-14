@@ -3,7 +3,7 @@ from __future__ import print_function
 from __future__ import absolute_import
 import unittest
 import tensorflow as tf
-from jpyutils.mltools import utils
+import jpyutils.mlutils as utils
 
 class TestRandom(unittest.TestCase):
     def setUp(self):
@@ -14,52 +14,52 @@ class TestRandom(unittest.TestCase):
         word2id = { "hello": 4, "world": 8, "It": 7, "is": 5, "outside": 6}
 
         # default usage
-        array_1, sizes_1 = utils.text.text2array(sentences, word2id)
-        self.assertEqual(array_1.shape, (2, 6))
-        self.assertListEqual(array_1[0].tolist(), [0, 4, 8, 1, 3, 3])
-        self.assertListEqual(array_1[1].tolist(), [0, 7, 5, 2, 6, 1])
+        array_1, sizes_1 = utils.text.text2array(sentences, word2id, 1, 0)
+        self.assertEqual(array_1.shape, (2, 4))
+        self.assertListEqual(array_1[0].tolist(), [4, 8, 1, 1])
+        self.assertListEqual(array_1[1].tolist(), [7, 5, 0, 6])
         self.assertEqual(sizes_1.shape, (2,))
-        self.assertListEqual(sizes_1.tolist(), [4, 6])
+        self.assertListEqual(sizes_1.tolist(), [2, 4])
 
         # some sentences' length is longer than 'maxlen'
-        array_2, sizes_2 = utils.text.text2array(sentences, word2id, maxlen=3 + 2)
-        self.assertEqual(array_2.shape, (2, 5))
-        self.assertListEqual(array_2[0].tolist(), [0, 4, 8, 1, 3])
-        self.assertListEqual(array_2[1].tolist(), [0, 7, 5, 2, 1])
+        array_2, sizes_2 = utils.text.text2array(sentences, word2id, 1, 0, maxlen=3)
+        self.assertEqual(array_2.shape, (2, 3))
+        self.assertListEqual(array_2[0].tolist(), [4, 8, 1])
+        self.assertListEqual(array_2[1].tolist(), [7, 5, 0])
         self.assertEqual(sizes_2.shape, (2,))
-        self.assertListEqual(sizes_2.tolist(), [4, 5])
+        self.assertListEqual(sizes_2.tolist(), [2, 3])
 
         # some sentences' length is much longer than 'maxlen'
-        array_3, sizes_3 = utils.text.text2array(sentences, word2id, maxlen=1 + 2)
-        self.assertEqual(array_3.shape, (2, 3))
-        self.assertListEqual(array_3[0].tolist(), [0, 4, 1])
-        self.assertListEqual(array_3[1].tolist(), [0, 7, 1])
+        array_3, sizes_3 = utils.text.text2array(sentences, word2id, 1, 0, maxlen=1)
+        self.assertEqual(array_3.shape, (2, 1))
+        self.assertListEqual(array_3[0].tolist(), [4])
+        self.assertListEqual(array_3[1].tolist(), [7])
         self.assertEqual(sizes_3.shape, (2,))
-        self.assertListEqual(sizes_3.tolist(), [3, 3])
+        self.assertListEqual(sizes_3.tolist(), [1, 1])
 
         # all sentences' length is is shorter than 'maxlen'
-        array_4, sizes_4 = utils.text.text2array(sentences, word2id, maxlen=8 + 2)
-        self.assertEqual(array_4.shape, (2, 10))
-        self.assertListEqual(array_4[0].tolist(), [0, 4, 8, 1, 3, 3, 3, 3, 3, 3])
-        self.assertListEqual(array_4[1].tolist(), [0, 7, 5, 2, 6, 1, 3, 3, 3, 3])
+        array_4, sizes_4 = utils.text.text2array(sentences, word2id, 1, 0, maxlen=8)
+        self.assertEqual(array_4.shape, (2, 8))
+        self.assertListEqual(array_4[0].tolist(), [4, 8, 1, 1, 1, 1, 1, 1])
+        self.assertListEqual(array_4[1].tolist(), [7, 5, 0, 6, 1, 1, 1, 1])
         self.assertEqual(sizes_4.shape, (2,))
-        self.assertListEqual(sizes_4.tolist(), [4, 6])
+        self.assertListEqual(sizes_4.tolist(), [2, 4])
 
-        # do not use 'beg' sentry
-        array_5, sizes_5 = utils.text.text2array(sentences, word2id, maxlen=5 + 2, beg=None)
+        # use 'beg' sentry
+        array_5, sizes_5 = utils.text.text2array(sentences, word2id, 1, 0, maxlen=5 + 2, beg=2)
         self.assertEqual(array_5.shape, (2, 7))
-        self.assertListEqual(array_5[0].tolist(), [4, 8, 1, 3, 3, 3, 3])
-        self.assertListEqual(array_5[1].tolist(), [7, 5, 2, 6, 1, 3, 3])
+        self.assertListEqual(array_5[0].tolist(), [2, 4, 8, 1, 1, 1, 1])
+        self.assertListEqual(array_5[1].tolist(), [2, 7, 5, 0, 6, 1, 1])
         self.assertEqual(sizes_5.shape, (2,))
         self.assertListEqual(sizes_5.tolist(), [3, 5])
 
         # skip unknown tokens.
-        array_6, sizes_6 = utils.text.text2array(sentences, word2id, maxlen=5 + 2, unknown=None)
+        array_6, sizes_6 = utils.text.text2array(sentences, word2id, 1, maxlen=5 + 2)
         self.assertEqual(array_6.shape, (2, 7))
-        self.assertListEqual(array_6[0].tolist(), [0, 4, 8, 1, 3, 3, 3])
-        self.assertListEqual(array_6[1].tolist(), [0, 7, 5, 6, 1, 3, 3])
+        self.assertListEqual(array_6[0].tolist(), [4, 8, 1, 1, 1, 1, 1])
+        self.assertListEqual(array_6[1].tolist(), [7, 5, 6, 1, 1, 1, 1])
         self.assertEqual(sizes_6.shape, (2,))
-        self.assertListEqual(sizes_6.tolist(), [4, 5])
+        self.assertListEqual(sizes_6.tolist(), [2, 3])
 
     def test_clip_sentence(self):
         sess = tf.InteractiveSession()
@@ -109,7 +109,7 @@ class TestRandom(unittest.TestCase):
 
     def test_word_seg_tags(self):
         sentence = "中华人民共和国今天成立了"
-        seg_tags, id2tag = utils.text.word_seg_tags(sentence)
+        seg_tags, id2tag, tag2id = utils.text.word_seg_tags(sentence)
         self.assertEqual(len(seg_tags), len(sentence))
         self.assertEqual(len(id2tag), 4)
 
