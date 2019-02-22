@@ -81,7 +81,7 @@ class ProcRunner(multiprocessing.Process):
         if share_dict is not None and \
                 not isinstance(share_dict, multiprocessing.managers.DictProxy):
             raise TypeError("Parameter 'share_dict' should be type " \
-                            "multiprocessing.managers.SyncManager")
+                            "multiprocessing.managers.DictProxy")
 
         super(__class__, self).__init__(target=target, name=name, args=args, kwargs=kwargs)
         self.daemon = daemon
