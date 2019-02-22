@@ -69,7 +69,7 @@ class TestProcRunner(unittest.TestCase):
         )
         proc.start()
         proc.join()
-        self.assertEqual(proc.info['return'], b'1 + 3 = 4')
+        self.assertEqual(proc.info['return'], '1 + 3 = 4')
 
 if __name__ == "__main__":
     unittest.main()
