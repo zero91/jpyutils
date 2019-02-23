@@ -13,39 +13,39 @@ class TestTaskDependencyManager(unittest.TestCase):
         pass
 
     def test_add_dependency(self):
-        dependency_manager = runner.multi_task_runner.TaskDependencyManager()
+        dependency_manager = runner.multi_task_runner.DependencyManager()
 
-        dependency_manager.add_dependency("run_task1", "task1,task2")
+        dependency_manager.add("run_task1", "task1,task2")
         self.assertEqual(len(dependency_manager._m_task_id), 1)
         self.assertEqual(len(dependency_manager._m_task_id['run_task1']), 2)
         self.assertEqual(len(dependency_manager._m_dependency_info['run_task1']), 2)
 
-        dependency_manager.add_dependency("run_task2", "run_task1")
+        dependency_manager.add("run_task2", "run_task1")
         self.assertEqual(len(dependency_manager._m_task_id), 2)
         self.assertEqual(len(dependency_manager._m_task_id['run_task2']), 2)
         self.assertEqual(len(dependency_manager._m_dependency_info['run_task2']), 1)
 
     def test_get_dependency(self):
-        dependency_manager = runner.multi_task_runner.TaskDependencyManager()
-        dependency_manager.add_dependency("run_task1", "task1,task2")
+        dependency_manager = runner.multi_task_runner.DependencyManager()
+        dependency_manager.add("run_task1", "task1,task2")
 
-        depend_tasks_set = dependency_manager.get_dependency("run_task1")
+        depend_tasks_set = dependency_manager.get("run_task1")
         self.assertEqual(len(depend_tasks_set), 2)
         self.assertTrue(isinstance(depend_tasks_set, set))
         self.assertTrue("task1" in depend_tasks_set)
         self.assertTrue("task2" in depend_tasks_set)
 
         with self.assertRaises(KeyError) as exception:
-            dependency_manager.get_dependency("non_exist_task")
+            dependency_manager.get("non_exist_task")
 
     def test_add_dependency(self):
-        dependency_manager_1 = runner.multi_task_runner.TaskDependencyManager.from_data([
+        dependency_manager_1 = runner.multi_task_runner.DependencyManager.from_data([
                 ("run_task1", "task1,task2"),
                 ("run_task2", "run_task1"),
         ])
         self.assertFalse(dependency_manager_1.is_topological())
 
-        dependency_manager_2 = runner.multi_task_runner.TaskDependencyManager.from_data([
+        dependency_manager_2 = runner.multi_task_runner.DependencyManager.from_data([
                 ("task1", None),
                 ("task2", None),
                 ("run_task1", "task1,task2"),
@@ -54,26 +54,24 @@ class TestTaskDependencyManager(unittest.TestCase):
         self.assertTrue(dependency_manager_2.is_topological())
 
     def test_get_tasks_info(self):
-        dependency_manager = runner.multi_task_runner.TaskDependencyManager.from_data([
+        dependency_manager = runner.multi_task_runner.DependencyManager.from_data([
                 ("task1", None),
                 ("task2", None),
                 ("run_task1", "task1,task2"),
                 ("run_task2", "run_task1"),
         ])
-        is_valid, task_info = dependency_manager.get_tasks_info()
-        self.assertTrue(is_valid)
+        task_info = dependency_manager.get_task_info()
         self.assertEqual(len(task_info), 4)
         self.assertEqual(len(task_info['task1']), 4)
 
     def test_parse_tasks(self):
-        dependency_manager = runner.multi_task_runner.TaskDependencyManager.from_data([
+        dependency_manager = runner.multi_task_runner.DependencyManager.from_data([
                 ("task1", None),
                 ("task2", None),
                 ("run_task1", "task1,task2"),
                 ("run_task2", "run_task1"),
         ])
-        is_valid, tasks_info = dependency_manager.parse_tasks("1,2,4-8").get_tasks_info()
-        self.assertTrue(is_valid)
+        tasks_info = dependency_manager.parse_tasks("1,2,4-8").get_task_info()
         self.assertEqual(len(tasks_info), 2)
 
 
@@ -86,9 +84,9 @@ class TestMultiTaskRunner(unittest.TestCase):
 
     def test_add(self):
         # add
-        scheduler = runner.MultiTaskRunner(render_arguments={"mark": "jpyutils", "num": "2018"})
+        scheduler = runner.MultiTaskRunner()
         scheduler.add(
-            command = "ls -l",
+            target = "ls -l",
             name = "test001",
             stdout = subprocess.PIPE,
             stderr = subprocess.PIPE,
@@ -96,7 +94,7 @@ class TestMultiTaskRunner(unittest.TestCase):
         )
 
         scheduler.add(
-            command = "echo <%= mark %> + <%= num %>",
+            target = "echo 'this is test002'",
             name = "test002",
             depends="test001",
             stdout = subprocess.PIPE,
@@ -105,7 +103,7 @@ class TestMultiTaskRunner(unittest.TestCase):
         )
 
         scheduler.add(
-            command = lambda s: print(sum(s)),
+            target = lambda s: print(sum(s)),
             name = "add_sum",
             depends = "test002",
             args = (range(1000000),)
@@ -115,11 +113,11 @@ class TestMultiTaskRunner(unittest.TestCase):
         # adds
         scheduler = runner.MultiTaskRunner(render_arguments={"mark": "jpyutils", "num": "2018"})
 
-        scheduler.adds('Runner(name = "ls_<%= num %>", command = "ls",)')
+        scheduler.adds('Runner(name = "ls_<%= num %>", target = "ls",)')
         scheduler.adds(
             'Runner('
             '    name = "ls_<%=mark%>",'
-            '    command = "ls",'
+            '    target = "ls",'
             '    depends = "ls_<%=num%>",'
             '    shell   = True,'
             ')'
@@ -127,15 +125,17 @@ class TestMultiTaskRunner(unittest.TestCase):
         self.assertEqual(scheduler.run(), 0)
 
         # addf
-        scheduler = runner.MultiTaskRunner(render_arguments={"mark": "jpyutils", "num": "2018"})
+        scheduler = runner.MultiTaskRunner(render_arguments={"mark": "jpyutils", "num": "2018"}, log_path="./logs")
         conf_path = os.path.dirname(os.path.realpath(__file__))
         scheduler.addf(os.path.join(conf_path, "multi_tasks.conf"))
-        self.assertEqual(scheduler.run(), 0)
+        scheduler.lists()
+        self.assertEqual(scheduler.run(verbose=True), 0)
 
     def test_run(self):
         conf_path = os.path.dirname(os.path.realpath(__file__))
         scheduler = runner.MultiTaskRunner(render_arguments={"mark": "jpyutils", "num": "2018"})
         scheduler.addf(os.path.join(conf_path, "multi_tasks.conf"))
+        scheduler.lists()
         self.assertEqual(scheduler.run("2,3,5-7,10-11"), 0)
 
     def test_lists(self):
@@ -153,5 +153,18 @@ class TestMultiTaskRunner(unittest.TestCase):
         self.assertListEqual(scheduler._render_arguments([2018, "num = <%= num %>"]),
                              [2018, "num = 2018"])
 
+
+class TestMultiTaskConfig(unittest.TestCase):
+    def setUp(self):
+        pass
+
+    def tearDown(self):
+        pass
+
+    def test_shit(self):
+        print("SHIT")
+
+
 if __name__ == '__main__':
     unittest.main()
+

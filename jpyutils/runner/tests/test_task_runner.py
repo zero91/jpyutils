@@ -5,6 +5,7 @@ import unittest
 import random
 import logging
 import time
+import sys
 import subprocess
 from jpyutils import runner
 
@@ -17,9 +18,7 @@ class TestTaskRunner(unittest.TestCase):
 
     def test_join(self):
         task = runner.TaskRunner(
-            cmd=["curl", "https://www.baidu.com"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
+            target=["curl", "https://www.baidu.com"],
         )
         task.start()
         task.join()

@@ -204,7 +204,6 @@ class TaskRunner(threading.Thread):
                 break
 
         if last_exitcode != 0:
-            print("shit %d" % (last_exitcode))
             self.exitcode = last_exitcode
             exit(last_exitcode)
 
@@ -243,9 +242,9 @@ class TaskRunner(threading.Thread):
                 }
         """
         if self.is_alive() and self._m_start_time is not None:
-            self._m_elapsed_time = time.tim() - self._m_start_time
+            self._m_elapsed_time = time.time() - self._m_start_time
 
-        if self._m_start_time > 0:
+        if self._m_start_time is not None:
             start_time = self._m_start_time
         else:
             start_time = None
