@@ -293,7 +293,7 @@ class MultiTaskRunner(object):
 
     """
     def __init__(self, log_path=None, parallel_degree=-1, retry=1, interval=5, 
-                                      render_arguments=None, displayer=None):
+                       share_mode=False, render_arguments=None, displayer=None):
         if log_path is not None:
             self._m_log_path = os.path.realpath(log_path)
         else:
@@ -409,15 +409,14 @@ class MultiTaskRunner(object):
                                                               share_dict=self._m_share_dict,
                                                               **popen_kwargs)
         else:
-            runner = TaskRunner(target, name=name, args=args, kwargs=kwargs,
-                                                              retry=self._m_retry,
-                                                              interval=self._m_interval,
-                                                              daemon=daemon,
-                                                              pre_hook=pre_hook,
-                                                              post_hook=post_hook,
-                                                              share_dict=self._m_share_dict,
-                                                              encoding=encoding,
-                                                              **popen_kwargs)
+            runner = TaskRunner(target, name=name, retry=self._m_retry,
+                                                   interval=self._m_interval,
+                                                   daemon=daemon,
+                                                   pre_hook=pre_hook,
+                                                   post_hook=post_hook,
+                                                   share_dict=self._m_share_dict,
+                                                   encoding=encoding,
+                                                   **popen_kwargs)
         self._m_runner_dict[runner.name] = {
             "status": TaskStatus.WAITING,
             "runner": runner,

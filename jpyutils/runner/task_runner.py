@@ -7,6 +7,7 @@ import signal
 import logging
 import json
 import copy
+import shlex
 import multiprocessing
 from multiprocessing import managers
 
@@ -15,7 +16,6 @@ class TaskRunner(threading.Thread):
     """Execute command in an independent process and maintain the new created process in a thread.
 
     The whole class signature is largely the same as that of the Popen constructor,
-    except that 'preexec_fn' is not permitted as it is used internally.
     All other supplied arguments are passed directly through to the Popen constructor.
 
     Parameters
@@ -33,12 +33,6 @@ class TaskRunner(threading.Thread):
     name: str
         The name of the task. Best using naming method of programming languages.
 
-    args: tuple
-        The argument tuple for the 'pre_hook' callable object invocation.
-
-    kwargs: dict
-        The dictionary of keyword arguments for the 'pre_hook' callable object invocation.
-
     retry: integer
         Try executing the command 'retry' times until succeed, otherwise failed.
 
@@ -50,7 +44,9 @@ class TaskRunner(threading.Thread):
 
     pre_hook: callable
         A callable object to be invoked before the command starts.
-        The input parameters is specified by paramaters 'args' and 'kwargs'.
+        Unlike ProcRunner, the input parameters is (command, config_params).
+        The first argument is the command in a list of strings which is used by execute.
+        The second argument is the configuration values.
 
     post_hook: callable
         A callable object to be invoked after the command execution.
@@ -85,13 +81,17 @@ class TaskRunner(threading.Thread):
 
     exitcode: The exit code after execute target.
 
+    Notes
+    -----
+    Child process can access configuration parameters throw the  environment variable
+    'TASK_RUNNER_PARAMETERS', which is a json string.
+
     """
-    def __init__(self, target, name=None, args=(), kwargs={},
-                               retry=1, interval=5, daemon=True,
-                               pre_hook=None, post_hook=None,
-                               share_dict=None,
-                               encoding="utf-8",
-                               **popen_kwargs):
+    def __init__(self, target, name=None, retry=1, interval=5, daemon=True,
+                                          pre_hook=None, post_hook=None,
+                                          share_dict=None,
+                                          encoding="utf-8",
+                                          **popen_kwargs):
         if not isinstance(target, (str, list, tuple)):
             raise TypeError("Parameter 'target' should be a string or a list")
 
@@ -100,7 +100,7 @@ class TaskRunner(threading.Thread):
             raise TypeError("Parameter 'share_dict' should be type " \
                             "multiprocessing.managers.DictProxy")
 
-        super(__class__, self).__init__(target=target, name=name, args=args, kwargs=kwargs)
+        super(__class__, self).__init__(target=target, name=name)
         self.daemon = daemon
         self.exitcode = None
 
@@ -146,9 +146,10 @@ class TaskRunner(threading.Thread):
         self._m_lock.release()
 
         # Reset Parameters of Popen
-        if "preexec_fn" in self._m_popen_kwargs:
-            raise ValueError("Argument 'preexec_fn' is not allowed, it will be used internally.")
-        self._m_popen_kwargs['preexec_fn'] = os.setsid
+        #if "preexec_fn" in self._m_popen_kwargs:
+        #    raise ValueError("Argument 'preexec_fn' is not allowed, it will be used internally.")
+        #self._m_popen_kwargs['preexec_fn'] = os.setsid
+        self._m_popen_kwargs['start_new_session'] = True
 
         if "close_fds" not in self._m_popen_kwargs:
             self._m_popen_kwargs["close_fds"] = True
@@ -159,8 +160,25 @@ class TaskRunner(threading.Thread):
             stdout_stream = self._m_popen_kwargs.get("stdout", sys.stdout)
         self._m_popen_kwargs["stdout"] = subprocess.PIPE
 
+        if "env" not in self._m_popen_kwargs:
+            self._m_popen_kwargs["env"] = copy.deepcopy(os.environ)
+
+        # Setup Share Parameters
+        input_params = dict()
+        if self._m_share_dict is not None and self.name in self._m_share_dict \
+                                          and "input" in self._m_share_dict[self.name]:
+            input_params = self._m_share_dict[self.name]["input"]
+
+        self._m_popen_kwargs["env"]["TASK_RUNNER_PARAMETERS"] = json.dumps(input_params)
+
         # Execute Pre-Hook
-        if self._m_pre_hook is not None and self._m_pre_hook(*self._args, **self._kwargs) != 0:
+        if isinstance(self._target, str):
+            target = shlex.split(self._target)
+        else:
+            target = copy.deepcopy(self._target)
+
+        if self._m_pre_hook is not None and \
+                self._m_pre_hook(target, input_params) not in (0, None):
             raise RuntimeError("Execute pre_hook failed, please check the input parameters")
 
         target_ret_value = None
@@ -208,12 +226,14 @@ class TaskRunner(threading.Thread):
             exit(last_exitcode)
 
         if self._m_post_hook is not None and \
-                self._m_post_hook(copy.deepcopy(target_ret_value)) != 0:
+                self._m_post_hook(copy.deepcopy(target_ret_value)) not in (0, None):
             raise RuntimeError("Execute post_hook failed, please check the output values")
 
         self._m_return_value = copy.deepcopy(target_ret_value)
         if self._m_share_dict is not None:
-            self._m_share_dict[self.name] = copy.deepcopy(target_ret_value)
+            params = self._m_share_dict.get(self.name, dict())
+            params.update({"output": target_ret_value})
+            self._m_share_dict.update({self.name: params})
 
         self.exitcode = last_exitcode
         self._m_elapsed_time = time.time() - self._m_start_time
