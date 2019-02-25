@@ -75,7 +75,7 @@ class ProcRunner(multiprocessing.Process):
     def __init__(self, target, name=None, args=(), kwargs={}, stdin=None, stdout=None, stderr=None,
                                retry=1, interval=5, daemon=True,
                                pre_hook=None, post_hook=None,
-                               share_dict=None):
+                               share_dict=None, share_dict_lock=None):
         if not callable(target):
             raise TypeError("Parameter 'target' should be callable")
 
@@ -99,6 +99,7 @@ class ProcRunner(multiprocessing.Process):
 
         self._m_lock = multiprocessing.Lock()
         self._m_share_dict = share_dict
+        self._m_share_dict_lock = share_dict_lock
         self._m_manager = multiprocessing.Manager()
         self._m_proc_info = self._m_manager.dict({"try_num": 0})
 
@@ -116,22 +117,28 @@ class ProcRunner(multiprocessing.Process):
 
         if self._m_share_dict is not None and self.name in self._m_share_dict \
                                           and "input" in self._m_share_dict[self.name]:
-            exist_params = set()
-            share_args = list()
-            for param_name, param_value in zip(
-                            inspect.signature(self._target).parameters, self._args):
-                exist_params.add(param_name)
-                share_args.append(param_value)
+            if self._m_share_dict_lock is not None:
+                self._m_share_dict_lock.acquire()
 
-            share_kwargs = dict()
-            for param_name, param_value in self._kwargs.items():
-                exist_params.add(param_name)
-                share_kwargs[param_name] = param_value
+            try:
+                exist_params = set()
+                share_args = list()
+                for param_name, param_value in zip(
+                                inspect.signature(self._target).parameters, self._args):
+                    exist_params.add(param_name)
+                    share_args.append(param_value)
 
-            for param_name, param_value in self._m_share_dict[self.name]["input"].items():
-                if param_name not in exist_params:
+                share_kwargs = dict()
+                for param_name, param_value in self._kwargs.items():
+                    exist_params.add(param_name)
                     share_kwargs[param_name] = param_value
 
+                for param_name, param_value in self._m_share_dict[self.name]["input"].items():
+                    if param_name not in exist_params:
+                        share_kwargs[param_name] = param_value
+            finally:
+                if self._m_share_dict_lock is not None:
+                    self._m_share_dict_lock.release()
         else:
             share_args = self._args
             share_kwargs = self._kwargs
@@ -172,9 +179,17 @@ class ProcRunner(multiprocessing.Process):
 
         self._m_proc_info["return"] = copy.deepcopy(target_ret_value)
         if self._m_share_dict is not None:
-            params = self._m_share_dict.get(self.name, dict())
-            params.update({"output": target_ret_value})
-            self._m_share_dict.update({self.name: params})
+            if self._m_share_dict_lock is not None:
+                self._m_share_dict_lock.acquire()
+
+            try:
+                params = self._m_share_dict.get(self.name, dict())
+                params.update({"output": target_ret_value})
+                self._m_share_dict.update({self.name: params})
+            finally:
+                if self._m_share_dict_lock is not None:
+                    self._m_share_dict_lock.release()
+
         self._m_proc_info["elapsed_time"] = time.time() - self._m_proc_info["start_time"]
         exit(0)
 

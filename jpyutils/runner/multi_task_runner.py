@@ -9,7 +9,9 @@ import re
 import os
 import collections
 import copy
+import json
 import logging
+import hashlib
 import multiprocessing
 
 
@@ -293,7 +295,7 @@ class MultiTaskRunner(object):
 
     """
     def __init__(self, log_path=None, parallel_degree=-1, retry=1, interval=5, 
-                       share_mode=False, render_arguments=None, displayer=None):
+                       config=None, render_arguments=None, displayer=None):
         if log_path is not None:
             self._m_log_path = os.path.realpath(log_path)
         else:
@@ -651,9 +653,111 @@ class MultiTaskRunner(object):
 
 
 class MultiTaskConfig(object):
-    def __init__(self):
+    def __init__(self, ):
+        self._m_global_key = "__global__"
+
         self._m_config = {
             "__global__": {
+                "data": {
+                    "train": "../data_out/train.txt",
+                    "test": "../data_out/test.txt",
+                },
+                "model": {
+                    "locale": "zh_CN",
+                    "domain": "sms",
+                },
+                "accuracy": {
+                    "train": None,
+                    "test": None,
+                }
+            },
+            "task": {
+                "input": {
+                    "train_fname": "data.train",
+                    "test_fname": "data.test",
+                    "locale": "model.locale",
+                    "domain": "model.domain",
+                },
+                "output":{
+                    "train_acc": "accuracy.train",
+                    "test_acc": "accuracy.test",
+                },
             }
         }
+        self._m_manager = multiprocessing.Manager()
+        self._m_share_config_lock = multiprocessing.Lock()
+        self._m_share_config = self._m_manager.dict()
+        self._m_share_config_hash = None
+        self._render_config2share()
+
+    @property
+    def share_config(self):
+        return self._m_share_config, self._m_share_config_lock
+
+    def update(self):
+        self._m_share_config_lock.acquire()
+        try:
+            new_share_config_hash = self.__share_config_hashcode()
+            if new_share_config_hash == self._m_share_config_hash:
+                return
+            self._m_share_config_hash = new_share_config_hash
+            self._render_share2config()
+            self._render_config2share()
+        finally:
+            self._m_share_config_lock.release()
+
+    def load(self):
+        print("---- status -----")
+        print(json.dumps(self._m_config, indent=4))
+        print(self._m_share_config)
+        print("-----------------")
+
+    def _render_config2share(self):
+        share_config = dict()
+        for name, config in self._m_config.items():
+            if name == self._m_global_key:
+                continue
+            share_config[name] = {}
+            for key in ["input", "output"]:
+                share_config[name][key] = {}
+                for item, item_scope in config[key].items():
+                    share_config[name][key][item] = self.__get_config_item(item_scope)
+        self._m_share_config.update(share_config)
+        self._m_share_config_hash = self.__share_config_hashcode()
+
+    def _render_share2config(self):
+        for name, config in self._m_config.items():
+            if name == self._m_global_key:
+                continue
+            if name not in self._m_share_config:
+                continue
+
+            for item, item_scope in config["output"].items():
+                if item not in self._m_share_config[name]["output"]:
+                    continue
+                self.__set_config_item(item_scope, self._m_share_config[name]["output"][item])
+
+    def __get_config_item(self, scope):
+        name_scope_list = scope.strip().split('.')
+        if len(name_scope_list) == 0 or name_scope_list[0] != self._m_global_key:
+            name_scope_list.insert(0, self._m_global_key)
+
+        config = self._m_config
+        for name_scope in name_scope_list:
+            config = config[name_scope]
+        return config
+
+    def __set_config_item(self, scope, value):
+        name_scope_list = scope.strip().split('.')
+        if len(name_scope_list) == 0 or name_scope_list[0] != self._m_global_key:
+            name_scope_list.insert(0, self._m_global_key)
+
+        config = self._m_config
+        for name_scope in name_scope_list[:-1]:
+            config = config[name_scope]
+        config[name_scope_list[-1]] = value
+
+    def __share_config_hashcode(self):
+        share_config_str = json.dumps(self._m_share_config.copy(), sort_keys=True)
+        return hashlib.md5(share_config_str.encode("utf-8")).hexdigest()
 

@@ -89,7 +89,7 @@ class TaskRunner(threading.Thread):
     """
     def __init__(self, target, name=None, retry=1, interval=5, daemon=True,
                                           pre_hook=None, post_hook=None,
-                                          share_dict=None,
+                                          share_dict=None, share_dict_lock=None,
                                           encoding="utf-8",
                                           **popen_kwargs):
         if not isinstance(target, (str, list, tuple)):
@@ -115,6 +115,7 @@ class TaskRunner(threading.Thread):
         self._m_post_hook = post_hook
 
         self._m_share_dict = share_dict
+        self._m_share_dict_lock = share_dict_lock
         self._m_encoding = encoding
         self._m_popen_kwargs = popen_kwargs
 
@@ -167,7 +168,13 @@ class TaskRunner(threading.Thread):
         input_params = dict()
         if self._m_share_dict is not None and self.name in self._m_share_dict \
                                           and "input" in self._m_share_dict[self.name]:
-            input_params = self._m_share_dict[self.name]["input"]
+            if self._m_share_dict_lock is not None:
+                self._m_share_dict_lock.acquire()
+            try:
+                input_params = self._m_share_dict[self.name]["input"]
+            finally:
+                if self._m_share_dict_lock is not None:
+                    self._m_share_dict_lock.release()
 
         self._m_popen_kwargs["env"]["TASK_RUNNER_PARAMETERS"] = json.dumps(input_params)
 
@@ -231,9 +238,16 @@ class TaskRunner(threading.Thread):
 
         self._m_return_value = copy.deepcopy(target_ret_value)
         if self._m_share_dict is not None:
-            params = self._m_share_dict.get(self.name, dict())
-            params.update({"output": target_ret_value})
-            self._m_share_dict.update({self.name: params})
+            if self._m_share_dict_lock is not None:
+                self._m_share_dict_lock.acquire()
+
+            try:
+                params = self._m_share_dict.get(self.name, dict())
+                params.update({"output": target_ret_value})
+                self._m_share_dict.update({self.name: params})
+            finally:
+                if self._m_share_dict_lock is not None:
+                    self._m_share_dict_lock.release()
 
         self.exitcode = last_exitcode
         self._m_elapsed_time = time.time() - self._m_start_time
