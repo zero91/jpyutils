@@ -1,0 +1,28 @@
+__global__:
+    data:
+        train: ../data_out/train.txt
+        test: ../data_out/test.txt
+    model:
+        model_type: LSTM+CRF
+        crf_enabled: True
+        save_path: ../data_out/model
+    accuracy:
+        train: null
+        test: null
+
+train:
+    input:
+        train_fname: data.train
+        test_fname: data.test
+        model_type: model.model_type
+    output:
+        model_path: model.save_path
+
+evaluate:
+    input:
+        model: model.save_path
+    output:
+        train_acc: accuracy.train
+        test_acc: accuracy.test
+
+

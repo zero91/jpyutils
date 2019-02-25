@@ -10,6 +10,18 @@ import subprocess
 import sys
 from jpyutils import runner
 
+def test_func(name, age, money=100):
+    print("-" * 100)
+    print("Begin test_func")
+    print("name = '%s'" % (name))
+    print("age = '%s'" % (age))
+    print("money = '%s'" % (money))
+
+    print("End test_func")
+    print("-" * 100)
+    #return {"name": "Hello " + name, "age": age + 100, "money": money * 10000}
+
+
 class TestProcRunner(unittest.TestCase):
     def setUp(self):
         pass
@@ -70,6 +82,34 @@ class TestProcRunner(unittest.TestCase):
         proc.start()
         proc.join()
         self.assertEqual(proc.info['return'], '1 + 3 = 4')
+
+    def test_share_data(self):
+        import multiprocessing
+        m = multiprocessing.Manager()
+        share_dict = m.dict({
+            "proc": {
+                "input": {
+                    "name": "zhangjian",
+                    "age": 19,
+                    "money": 88,
+                },
+                #"output": {}
+            }
+        })
+
+        proc = runner.ProcRunner(
+            target = test_func,
+            name = "proc",
+            args=("zero91", 28),
+            #kwargs={"money": 50},
+            share_dict=share_dict
+        )
+        proc.start()
+        proc.join()
+        print("=" * 100)
+        print("share_dict = %s" % (share_dict))
+        print("DONE")
+        print("=" * 100)
 
 if __name__ == "__main__":
     unittest.main()

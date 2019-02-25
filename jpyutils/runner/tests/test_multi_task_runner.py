@@ -162,7 +162,13 @@ class TestMultiTaskConfig(unittest.TestCase):
         pass
 
     def test_shit(self):
-        print("SHIT")
+        config_fname = "./conf/multi_task_config.yaml"
+        config = runner.MultiTaskConfig(config_fname)
+
+        config.share_config.update({"evaluate": {"output": {"train_acc": 0.91}}})
+
+        config.save(config_fname + ".new")
+        config.dump_config(config_fname + ".true")
 
 
 if __name__ == '__main__':

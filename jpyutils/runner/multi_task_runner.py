@@ -12,6 +12,7 @@ import copy
 import json
 import logging
 import hashlib
+import yaml
 import multiprocessing
 
 
@@ -319,8 +320,10 @@ class MultiTaskRunner(object):
         self._m_running_tasks = set()
         self._m_started = False
 
-        self._m_manager = multiprocessing.Manager()
-        self._m_share_dict = self._m_manager.dict()
+        if config is not None:
+            self._m_config = MultiTaskConfig(config)
+        else:
+            self._m_config = None
 
         if displayer is None:
             self._m_displayer_class = TableProgressDisplay
@@ -401,24 +404,32 @@ class MultiTaskRunner(object):
                 popen_kwargs[sname] = open("%s/%s.%s" % (self._m_log_path, name, sname), open_tag)
                 self._m_open_file_list.append(popen_kwargs[sname])
 
+        share_config = None
+        share_config_lock = None
+        if self._m_config is not None:
+            share_config = self._m_config.share_config
+            share_config_lock = self._m_config.share_config_lock
+
         if callable(target):
             runner = ProcRunner(target, name=name, args=args, kwargs=kwargs,
-                                                              retry=self._m_retry,
-                                                              interval=self._m_interval,
-                                                              daemon=daemon,
-                                                              pre_hook=pre_hook,
-                                                              post_hook=post_hook,
-                                                              share_dict=self._m_share_dict,
-                                                              **popen_kwargs)
+                                        retry=self._m_retry,
+                                        interval=self._m_interval,
+                                        daemon=daemon,
+                                        pre_hook=pre_hook,
+                                        post_hook=post_hook,
+                                        share_dict=share_config,
+                                        share_dict_lock=share_config_lock,
+                                        **popen_kwargs)
         else:
             runner = TaskRunner(target, name=name, retry=self._m_retry,
-                                                   interval=self._m_interval,
-                                                   daemon=daemon,
-                                                   pre_hook=pre_hook,
-                                                   post_hook=post_hook,
-                                                   share_dict=self._m_share_dict,
-                                                   encoding=encoding,
-                                                   **popen_kwargs)
+                                        interval=self._m_interval,
+                                        daemon=daemon,
+                                        pre_hook=pre_hook,
+                                        post_hook=post_hook,
+                                        share_dict=share_config,
+                                        share_dict_lock=share_config_lock,
+                                        encoding=encoding,
+                                        **popen_kwargs)
         self._m_runner_dict[runner.name] = {
             "status": TaskStatus.WAITING,
             "runner": runner,
@@ -653,37 +664,17 @@ class MultiTaskRunner(object):
 
 
 class MultiTaskConfig(object):
-    def __init__(self, ):
-        self._m_global_key = "__global__"
+    def __init__(self, config, global_key="__global__"):
+        self._m_global_key = global_key
 
-        self._m_config = {
-            "__global__": {
-                "data": {
-                    "train": "../data_out/train.txt",
-                    "test": "../data_out/test.txt",
-                },
-                "model": {
-                    "locale": "zh_CN",
-                    "domain": "sms",
-                },
-                "accuracy": {
-                    "train": None,
-                    "test": None,
-                }
-            },
-            "task": {
-                "input": {
-                    "train_fname": "data.train",
-                    "test_fname": "data.test",
-                    "locale": "model.locale",
-                    "domain": "model.domain",
-                },
-                "output":{
-                    "train_acc": "accuracy.train",
-                    "test_acc": "accuracy.test",
-                },
-            }
-        }
+        if isinstance(config, dict):
+            self._m_config = copy.deepcopy(config)
+        elif isinstance(config, str):
+            with open(config, 'r') as fin:
+                self._m_config = yaml.safe_load(fin)
+        else:
+            raise TypeError("Parameter 'config' must be a dict or a string for file name")
+
         self._m_manager = multiprocessing.Manager()
         self._m_share_config_lock = multiprocessing.Lock()
         self._m_share_config = self._m_manager.dict()
@@ -692,7 +683,11 @@ class MultiTaskConfig(object):
 
     @property
     def share_config(self):
-        return self._m_share_config, self._m_share_config_lock
+        return self._m_share_config
+
+    @property
+    def share_config_lock(self):
+        return self._m_share_config_lock
 
     def update(self):
         self._m_share_config_lock.acquire()
@@ -700,17 +695,30 @@ class MultiTaskConfig(object):
             new_share_config_hash = self.__share_config_hashcode()
             if new_share_config_hash == self._m_share_config_hash:
                 return
-            self._m_share_config_hash = new_share_config_hash
             self._render_share2config()
             self._render_config2share()
         finally:
             self._m_share_config_lock.release()
 
-    def load(self):
-        print("---- status -----")
-        print(json.dumps(self._m_config, indent=4))
-        print(self._m_share_config)
-        print("-----------------")
+    def dump_config(self, fname):
+        fname = os.path.realpath(fname)
+        save_path = os.path.dirname(fname)
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+
+        self.update()
+        with open(fname, 'w') as fout:
+            yaml.safe_dump(self._m_share_config.copy(), fout, default_flow_style=False, indent=4)
+
+    def save(self, fname):
+        fname = os.path.realpath(fname)
+        save_path = os.path.dirname(fname)
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+
+        self.update()
+        with open(fname, 'w') as fout:
+            yaml.safe_dump(self._m_config, stream=fout, default_flow_style=False, indent=4)
 
     def _render_config2share(self):
         share_config = dict()
@@ -726,16 +734,21 @@ class MultiTaskConfig(object):
         self._m_share_config_hash = self.__share_config_hashcode()
 
     def _render_share2config(self):
+        share_config = self._m_share_config.copy()
         for name, config in self._m_config.items():
-            if name == self._m_global_key:
-                continue
-            if name not in self._m_share_config:
+            if name == self._m_global_key or name not in share_config:
                 continue
 
             for item, item_scope in config["output"].items():
-                if item not in self._m_share_config[name]["output"]:
+                if item not in share_config[name]["output"]:
+                    logging.warning("Task '%s' did not output expected item [%s]", name, item)
                     continue
-                self.__set_config_item(item_scope, self._m_share_config[name]["output"][item])
+                self.__set_config_item(item_scope, share_config[name]["output"][item])
+                share_config[name]["output"].pop(item)
+
+            if len(share_config[name]["output"]) > 0:
+                logging.warning("Task '%s' output unexpected values [%s]",
+                        name, json.dumps(share_config[name]["output"]))
 
     def __get_config_item(self, scope):
         name_scope_list = scope.strip().split('.')
