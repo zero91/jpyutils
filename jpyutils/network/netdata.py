@@ -160,7 +160,7 @@ def pip_download(dest_path, url, params, overwrite=False):
     else:
         pip_cmd = ["pip", "download", "--dest", tmp_path, "--index-url", url, package_name, deps]
 
-    task = runner.TaskRunner(cmd=pip_cmd, retry=3)
+    task = runner.TaskRunner(target=pip_cmd, retry=3)
     task.start()
     task.join()
 
