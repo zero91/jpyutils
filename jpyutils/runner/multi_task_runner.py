@@ -12,6 +12,7 @@ import copy
 import json
 import logging
 import hashlib
+import datetime
 import yaml
 import multiprocessing
 
@@ -578,6 +579,8 @@ class MultiTaskRunner(object):
                 if self._m_runner_dict[task_name]["runner"].is_alive():
                     continue
                 self._m_running_tasks.remove(task_name)
+                if self._m_config is not None:
+                    self._m_config.update()
 
                 exitcode = self._m_runner_dict[task_name]["runner"].exitcode
                 if exitcode != 0:
@@ -611,6 +614,12 @@ class MultiTaskRunner(object):
                 verbose and disp.display(refresh=True)
                 return 1
             time.sleep(0.1)
+
+        if self._m_config is not None and self._m_log_path is not None:
+            time_stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            save_fname = os.path.join(self._m_log_path, "config.%s.yaml" % (time_stamp))
+            self._m_config.save(save_fname)
+            self._m_config.dump_config(save_fname + ".debug")
 
         verbose and disp.display(refresh=True)
         return 0
@@ -729,7 +738,14 @@ class MultiTaskConfig(object):
             for key in ["input", "output"]:
                 share_config[name][key] = {}
                 for item, item_scope in config[key].items():
-                    share_config[name][key][item] = self.__get_config_item(item_scope)
+                    if not isinstance(item_scope, list):
+                        share_config[name][key][item] = self.__get_config_item(item_scope)
+                    else:
+                        item_list = list()
+                        for scope in item_scope:
+                            item_list.append(self.__get_config_item(scope))
+                        share_config[name][key][item] = item_list
+
         self._m_share_config.update(share_config)
         self._m_share_config_hash = self.__share_config_hashcode()
 
@@ -737,6 +753,11 @@ class MultiTaskConfig(object):
         share_config = self._m_share_config.copy()
         for name, config in self._m_config.items():
             if name == self._m_global_key or name not in share_config:
+                continue
+
+            if not isinstance(share_config[name]["output"], dict):
+                logging.warning("Task '%s' did not return a dict, it returned [%s]",
+                                name, share_config[name]["output"])
                 continue
 
             for item, item_scope in config["output"].items():
@@ -758,7 +779,7 @@ class MultiTaskConfig(object):
         config = self._m_config
         for name_scope in name_scope_list:
             config = config[name_scope]
-        return config
+        return copy.deepcopy(config)
 
     def __set_config_item(self, scope, value):
         name_scope_list = scope.strip().split('.')
@@ -768,7 +789,7 @@ class MultiTaskConfig(object):
         config = self._m_config
         for name_scope in name_scope_list[:-1]:
             config = config[name_scope]
-        config[name_scope_list[-1]] = value
+        config[name_scope_list[-1]] = copy.deepcopy(value)
 
     def __share_config_hashcode(self):
         share_config_str = json.dumps(self._m_share_config.copy(), sort_keys=True)

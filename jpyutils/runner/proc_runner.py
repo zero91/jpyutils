@@ -145,6 +145,7 @@ class ProcRunner(multiprocessing.Process):
 
         if self._m_pre_hook is not None and \
                 self._m_pre_hook(*share_args, **share_kwargs) not in (0, None):
+            self._m_proc_info["elapsed_time"] = time.time() - self._m_proc_info["start_time"]
             raise RuntimeError("Execute pre_hook failed, please check the input parameters")
 
         target_ret_value = None
@@ -171,10 +172,12 @@ class ProcRunner(multiprocessing.Process):
                 last_exitcode = 1
 
         if last_exitcode != 0:
+            self._m_proc_info["elapsed_time"] = time.time() - self._m_proc_info["start_time"]
             exit(last_exitcode)
 
         if self._m_post_hook is not None and \
                 self._m_post_hook(copy.deepcopy(target_ret_value)) not in (0, None):
+            self._m_proc_info["elapsed_time"] = time.time() - self._m_proc_info["start_time"]
             raise RuntimeError("Execute post_hook failed, please check the output values")
 
         self._m_proc_info["return"] = copy.deepcopy(target_ret_value)

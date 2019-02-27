@@ -186,6 +186,7 @@ class TaskRunner(threading.Thread):
 
         if self._m_pre_hook is not None and \
                 self._m_pre_hook(target, input_params) not in (0, None):
+            self._m_elapsed_time = time.time() - self._m_start_time
             raise RuntimeError("Execute pre_hook failed, please check the input parameters")
 
         target_ret_value = None
@@ -230,10 +231,12 @@ class TaskRunner(threading.Thread):
 
         if last_exitcode != 0:
             self.exitcode = last_exitcode
+            self._m_elapsed_time = time.time() - self._m_start_time
             exit(last_exitcode)
 
         if self._m_post_hook is not None and \
                 self._m_post_hook(copy.deepcopy(target_ret_value)) not in (0, None):
+            self._m_elapsed_time = time.time() - self._m_start_time
             raise RuntimeError("Execute post_hook failed, please check the output values")
 
         self._m_return_value = copy.deepcopy(target_ret_value)
