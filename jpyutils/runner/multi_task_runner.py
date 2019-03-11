@@ -764,7 +764,12 @@ class MultiTaskConfig(object):
                 if item not in share_config[name]["output"]:
                     logging.warning("Task '%s' did not output expected item [%s]", name, item)
                     continue
-                self.__set_config_item(item_scope, share_config[name]["output"][item])
+
+                try:
+                    self.__set_config_item(item_scope, share_config[name]["output"][item])
+                except Exception as e:
+                    self._m_config[name]["output"][item] = share_config[name]["output"][item]
+
                 share_config[name]["output"].pop(item)
 
             if len(share_config[name]["output"]) > 0:
@@ -772,14 +777,17 @@ class MultiTaskConfig(object):
                         name, json.dumps(share_config[name]["output"]))
 
     def __get_config_item(self, scope):
-        name_scope_list = scope.strip().split('.')
-        if len(name_scope_list) == 0 or name_scope_list[0] != self._m_global_key:
-            name_scope_list.insert(0, self._m_global_key)
+        try:
+            name_scope_list = scope.strip().split('.')
+            if len(name_scope_list) == 0 or name_scope_list[0] != self._m_global_key:
+                name_scope_list.insert(0, self._m_global_key)
 
-        config = self._m_config
-        for name_scope in name_scope_list:
-            config = config[name_scope]
-        return copy.deepcopy(config)
+            config = self._m_config
+            for name_scope in name_scope_list:
+                config = config[name_scope]
+            return copy.deepcopy(config)
+        except Exception as e:
+            return copy.deepcopy(scope)
 
     def __set_config_item(self, scope, value):
         name_scope_list = scope.strip().split('.')
