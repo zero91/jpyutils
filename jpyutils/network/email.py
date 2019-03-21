@@ -20,6 +20,7 @@ _email_server = {
         'sina.com': ('smtp.sina.com', (465,)),
         'sohu.com': ('smtp.sohu.com', (465,)),
         'jiehuozhe.com': ('smtp.exmail.qq.com', (465,)),
+        'apple.com': ('mail.apple.com': (25,)),
     },
 }
 
