@@ -288,6 +288,12 @@ class MultiTaskRunner(object):
     interval: float
         Interval time between each try.
 
+    config: str, dict
+        Configure for these tasks.
+
+    parameters: dict
+        Extra parameters for these bunch of tasks.
+
     render_arguments: dict
         Dict which used to replace tasks parameter for its true value.
         Used for add task from string.
@@ -297,7 +303,8 @@ class MultiTaskRunner(object):
 
     """
     def __init__(self, log_path=None, parallel_degree=-1, retry=1, interval=5, 
-                       config=None, render_arguments=None, displayer=None):
+                       config=None, parameters=None,
+                       render_arguments=None, displayer=None):
         if log_path is not None:
             self._m_log_path = os.path.realpath(log_path)
         else:
@@ -322,7 +329,7 @@ class MultiTaskRunner(object):
         self._m_started = False
 
         if config is not None:
-            self._m_config = MultiTaskConfig(config)
+            self._m_config = MultiTaskConfig(config, parameters)
         else:
             self._m_config = None
 
@@ -393,16 +400,17 @@ class MultiTaskRunner(object):
         if name in self._m_runner_dict:
             raise KeyError("Task {0} is already exists!".format(name))
 
-        if isinstance(self._m_log_path, str):
-            if not os.path.exists(self._m_log_path):
-                os.makedirs(self._m_log_path)
+        if self._m_log_path is not None:
+            logs_path = os.path.join(self._m_log_path, "logs")
+            if not os.path.exists(logs_path):
+                os.makedirs(logs_path)
 
             for sname in ["stdout", "stderr"]:
                 if sname in popen_kwargs:
                     logging.warning("Parameter '%s' already exists for task '%s'" % (sname, name))
                     continue
                 open_tag = 'a+' if append_log is True else 'w+'
-                popen_kwargs[sname] = open("%s/%s.%s" % (self._m_log_path, name, sname), open_tag)
+                popen_kwargs[sname] = open("%s/%s.%s" % (logs_path, name, sname), open_tag)
                 self._m_open_file_list.append(popen_kwargs[sname])
 
         share_config = None
@@ -591,6 +599,7 @@ class MultiTaskRunner(object):
                         self.lists()
                         logging.critical("Task '{0}' failed, exit code {1}\n".format(
                                                                 task_name, exitcode))
+                        self._dump_config()
                         return exitcode
                 else:
                     self._m_runner_dict[task_name]["status"] = TaskStatus.DONE
@@ -612,15 +621,11 @@ class MultiTaskRunner(object):
                         and finished_task_num == 0 \
                         and failed_task_num > 0:
                 verbose and disp.display(refresh=True)
+                self._dump_config()
                 return 1
             time.sleep(0.1)
 
-        if self._m_config is not None and self._m_log_path is not None:
-            time_stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            save_fname = os.path.join(self._m_log_path, "config.%s.yaml" % (time_stamp))
-            self._m_config.save(save_fname)
-            self._m_config.dump_config(save_fname + ".debug")
-
+        self._dump_config()
         verbose and disp.display(refresh=True)
         return 0
 
@@ -671,9 +676,17 @@ class MultiTaskRunner(object):
             return self._m_render_arguments[reg_match.group(1).strip()]
         return self._m_render_arg_pattern.sub(__lookup_func, param)
 
+    def _dump_config(self):
+        if self._m_config is not None and self._m_log_path is not None:
+            config_path = os.path.join(self._m_log_path, "config")
+            time_stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            save_fname = os.path.join(config_path, "config.%s.yaml" % (time_stamp))
+            self._m_config.save(save_fname)
+            self._m_config.dump_config(save_fname + ".debug")
+
 
 class MultiTaskConfig(object):
-    def __init__(self, config, global_key="__global__"):
+    def __init__(self, config, parameters=None, global_key="__parameters__"):
         self._m_global_key = global_key
 
         if isinstance(config, dict):
@@ -684,9 +697,15 @@ class MultiTaskConfig(object):
         else:
             raise TypeError("Parameter 'config' must be a dict or a string for file name")
 
+        if parameters is not None:
+            if isinstance(parameters, dict):
+                self._m_config[self._m_global_key].update(parameters)
+            else:
+                raise TypeError("Parameter 'parameters' is not a dict")
+
         self._m_manager = multiprocessing.Manager()
-        self._m_share_config_lock = multiprocessing.Lock()
         self._m_share_config = self._m_manager.dict()
+        self._m_share_config_lock = multiprocessing.Lock()
         self._m_share_config_hash = None
         self._render_config2share()
 
@@ -717,7 +736,7 @@ class MultiTaskConfig(object):
 
         self.update()
         with open(fname, 'w') as fout:
-            yaml.safe_dump(self._m_share_config.copy(), fout, default_flow_style=False, indent=4)
+            yaml.safe_dump(self._m_share_config.copy(), fout, default_flow_style=False, indent=2)
 
     def save(self, fname):
         fname = os.path.realpath(fname)
@@ -727,25 +746,33 @@ class MultiTaskConfig(object):
 
         self.update()
         with open(fname, 'w') as fout:
-            yaml.safe_dump(self._m_config, stream=fout, default_flow_style=False, indent=4)
+            yaml.safe_dump(self._m_config, stream=fout, default_flow_style=False, indent=2)
 
     def _render_config2share(self):
+        output_dict = dict()
         share_config = dict()
         for name, config in self._m_config.items():
             if name == self._m_global_key:
                 continue
-            share_config[name] = {}
-            for key in ["input", "output"]:
-                share_config[name][key] = {}
-                for item, item_scope in config[key].items():
-                    if not isinstance(item_scope, list):
-                        share_config[name][key][item] = self.__get_config_item(item_scope)
-                    else:
-                        item_list = list()
-                        for scope in item_scope:
-                            item_list.append(self.__get_config_item(scope))
-                        share_config[name][key][item] = item_list
+            share_config[name] = {"output": copy.deepcopy(config["output"])}
+            for item_name, item_value in config["output"].items():
+                output_dict[name + "." + item_name] = item_value
 
+        for name, config in self._m_config.items():
+            if name == self._m_global_key:
+                continue
+            share_config[name]["input"] = dict()
+            for item, item_scope in config["input"].items():
+                if not isinstance(item_scope, list):
+                    share_config[name]["input"][item] = \
+                            self.__get_config_item(item_scope, output_dict)
+                else:
+                    item_list = list()
+                    for scope in item_scope:
+                        item_list.append(self.__get_config_item(scope, output_dict))
+                    share_config[name]["input"][item] = item_list
+
+        self._m_share_config.clear()
         self._m_share_config.update(share_config)
         self._m_share_config_hash = self.__share_config_hashcode()
 
@@ -760,25 +787,24 @@ class MultiTaskConfig(object):
                                 name, share_config[name]["output"])
                 continue
 
-            for item, item_scope in config["output"].items():
+            for item in config["output"]:
                 if item not in share_config[name]["output"]:
                     logging.warning("Task '%s' did not output expected item [%s]", name, item)
                     continue
-
-                try:
-                    self.__set_config_item(item_scope, share_config[name]["output"][item])
-                except Exception as e:
-                    self._m_config[name]["output"][item] = share_config[name]["output"][item]
-
+                self._m_config[name]["output"][item] = share_config[name]["output"][item]
                 share_config[name]["output"].pop(item)
 
             if len(share_config[name]["output"]) > 0:
                 logging.warning("Task '%s' output unexpected values [%s]",
                         name, json.dumps(share_config[name]["output"]))
 
-    def __get_config_item(self, scope):
+    def __get_config_item(self, scope, output_dict=None):
         try:
-            name_scope_list = scope.strip().split('.')
+            scope = scope.strip()
+            if output_dict is not None and scope in output_dict:
+                return output_dict[scope]
+
+            name_scope_list = scope.split('.')
             if len(name_scope_list) == 0 or name_scope_list[0] != self._m_global_key:
                 name_scope_list.insert(0, self._m_global_key)
 
@@ -788,16 +814,6 @@ class MultiTaskConfig(object):
             return copy.deepcopy(config)
         except Exception as e:
             return copy.deepcopy(scope)
-
-    def __set_config_item(self, scope, value):
-        name_scope_list = scope.strip().split('.')
-        if len(name_scope_list) == 0 or name_scope_list[0] != self._m_global_key:
-            name_scope_list.insert(0, self._m_global_key)
-
-        config = self._m_config
-        for name_scope in name_scope_list[:-1]:
-            config = config[name_scope]
-        config[name_scope_list[-1]] = copy.deepcopy(value)
 
     def __share_config_hashcode(self):
         share_config_str = json.dumps(self._m_share_config.copy(), sort_keys=True)
