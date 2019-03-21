@@ -13,7 +13,7 @@ setup(
         "requests>=2.20.0",
         "jieba",
         "numpy",
-        "tensorflow>=1.3.0",
+        #"tensorflow>=1.3.0",
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
