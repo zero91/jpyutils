@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='jpyutils',
-    version='0.1.0',
+    version='0.1.1',
     description='To make daily work and study more efficient',
     author='Donald Cheung',
     author_email='jianzhang9102@gmail.com',
@@ -11,6 +11,9 @@ setup(
     python_requires='>=3.5',
     install_requires=[
         "requests>=2.20.0",
+        "jieba",
+        "numpy",
+        "tensorflow>=1.3.0",
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
