@@ -220,13 +220,15 @@ class TaskRunner(threading.Thread):
                 logging.warning("Proc '%s' exit with non-zero code '%d' on try %d/%d" % (
                         self.name, last_exitcode, self._m_try_num, self._m_retry_limit))
             else:
-                stdout_data = "".join(stdout_lines)
-                try:
-                    target_ret_value = json.loads(stdout_data)
-                except TypeError as te:
-                    target_ret_value = json.loads(stdout_data.decode(self._m_encoding))
-                except BaseException as be:
-                    pass
+                stdout_data = "".join(stdout_lines).strip()
+                for data in [stdout_data, stdout_data.split('\n')[-1]]:
+                    try:
+                        target_ret_value = json.loads(data)
+                        break
+                    except TypeError as te:
+                        target_ret_value = json.loads(data.decode(self._m_encoding))
+                    except BaseException as be:
+                        pass
                 break
 
         if last_exitcode != 0:

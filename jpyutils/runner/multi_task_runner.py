@@ -736,7 +736,7 @@ class MultiTaskConfig(object):
 
         self.update()
         with open(fname, 'w') as fout:
-            yaml.safe_dump(self._m_share_config.copy(), fout, default_flow_style=False, indent=2)
+            yaml.safe_dump(self._m_share_config.copy(), fout, default_flow_style=False, indent=4)
 
     def save(self, fname):
         fname = os.path.realpath(fname)
@@ -746,7 +746,7 @@ class MultiTaskConfig(object):
 
         self.update()
         with open(fname, 'w') as fout:
-            yaml.safe_dump(self._m_config, stream=fout, default_flow_style=False, indent=2)
+            yaml.safe_dump(self._m_config, stream=fout, default_flow_style=False, indent=4)
 
     def _render_config2share(self):
         output_dict = dict()
