@@ -638,9 +638,11 @@ class MultiTaskRunner(object):
     def terminate(self):
         """Terminate all running processes."""
         for task_name in self._m_running_tasks.copy():
-            self._m_runner_dict[task_name]["runner"].terminate()
-            self._m_runner_dict[task_name]["status"] = TaskStatus.KILLED
-            self._m_running_tasks.remove(task_name)
+            try:
+                self._m_runner_dict[task_name]["runner"].terminate()
+                self._m_runner_dict[task_name]["status"] = TaskStatus.KILLED
+            finally:
+                self._m_running_tasks.remove(task_name)
 
     def get_runner(self, task_name):
         """Get running instance of 'task_name'.

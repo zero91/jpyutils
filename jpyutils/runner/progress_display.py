@@ -143,7 +143,10 @@ class TableProgressDisplay(object):
             task_show_str_list.append(start_time.strftime("%m.%d %H:%M:%S"))
 
             task_show_str_list.append('|')
-            task_show_str_list.append(("%.2f" % (task_info['elapsed_time'])).ljust(\
+            elapsed_time = task_info['elapsed_time']
+            if elapsed_time is None:
+                elapsed_time = 0.0
+            task_show_str_list.append(("%.2f" % elapsed_time).ljust(\
                                                 self._m_task_info_length['elapsed_time']))
             task_show_str_list.append('|')
             task_show_str_list.append(task_info['try'].ljust(
