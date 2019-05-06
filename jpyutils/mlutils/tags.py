@@ -203,29 +203,29 @@ def is_start_chunk(prev_tag, cur_tag):
     return False
 
 
-def is_end_chunk(prev_tag, cur_tag):
-    """Check if a entity ended between the previous and current tags.
+def is_end_chunk(cur_tag, next_tag):
+    """Check if a entity ended between the current and next tags.
 
     Parameters
     ----------
-    prev_tag: str
-        Previous chunk tag.
-
     cur_tag: str
         Current chunk tag.
+
+    next_tag: str
+        Next chunk tag.
 
     Returns
     -------
     chunk_start: boolean.
-        True if previous tag is the end part of a entity, otherwise False.
+        True if current tag is the end part of a entity, otherwise False.
 
     """
-    if prev_tag == 'O': return False
-    if cur_tag == 'O': return True
+    if cur_tag == 'O': return False
+    if next_tag == 'O': return True
 
     cur_tag_pos, cur_tag_name = cur_tag.split('-')
-    prev_tag_pos, prev_tag_name = prev_tag.split('-')
-    if prev_tag_pos in ['E', 'S'] or cur_tag_name != prev_tag_name or cur_tag_pos in ['B', 'S']:
+    next_tag_pos, next_tag_name = next_tag.split('-')
+    if cur_tag_pos in ['E', 'S'] or next_tag_name != cur_tag_name or next_tag_pos in ['B', 'S']:
         return True
 
     return False
