@@ -110,7 +110,7 @@ class DecomposableNLIModelData(object):
         sizes2 = self._m_sizes2[self._m_batch_start_pos : self._m_batch_start_pos + batch_size]
         labels = self._m_labels[self._m_batch_start_pos : self._m_batch_start_pos + batch_size]
         self._m_batch_start_pos += batch_size
-        return (sentences1, sentences2, sizes1, sizes2, labels)
+       return (sentences1, sentences2, sizes1, sizes2, labels)
 
     def shuffle(self):
         """Shuffle internal data and reset batch index.
