@@ -40,7 +40,7 @@ def move_data(src_data_files, target_path, overwrite=False):
     is_str = True
     src_data_files = [src_data_files]
 
-  target_path = os.path.realpath(target_path)
+  #target_path = os.path.realpath(target_path)
   if os.path.isfile(target_path):
     if len(src_data_files) > 1:
       raise IOError(
@@ -55,8 +55,15 @@ def move_data(src_data_files, target_path, overwrite=False):
 
   else:
     if not os.path.exists(target_path) and len(src_data_files) == 1:
-      os.makedirs(os.path.dirname(target_path), exist_ok=True)
-      return shutil.move(src_data_files[0], target_path)
+      parent_path = os.path.dirname(target_path)
+      if parent_path == "":
+        parent_path = "."
+      else:
+        os.makedirs(parent_path, exist_ok=True)
+      target_fname = shutil.move(src_data_files[0], target_path)
+      if not is_str:
+        target_fname = [target_fname]
+      return target_fname
 
     os.makedirs(target_path, exist_ok=True)
     dest_data_files = set(os.listdir(target_path))

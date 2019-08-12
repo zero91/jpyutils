@@ -12,6 +12,7 @@ warnings.filterwarnings('always', category=DeprecationWarning,
 
 from lanfang import utils
 from lanfang import runner
+from lanfang import network
 from lanfang import dev
 
 
