@@ -84,8 +84,7 @@ class TopologicalGraph(object):
     for name in depends:
       self._m_node_info[name]["reverse_depends"].add(node_name)
 
-  @deprecated()
-  def get(self, node_name):
+  def depends(self, node_name):
     """Get dependent nodes.
 
     Parameters
@@ -128,6 +127,26 @@ class TopologicalGraph(object):
       key_func = lambda name: self._m_node_info[name]["initial_id"]
 
     return sorted(self._m_node_info, key=key_func)
+
+  def reverse_depends(self, node, recursive=False):
+    """Get offspring nodes.
+
+    Parameters
+    ----------
+    node: str
+      The name of the node.
+
+    recursive: bool
+      Return all offspring if set True, otherwise return child nodes.
+
+    """
+    reverse_nodes = self._m_node_info[node]["reverse_depends"]
+    if recursive is True:
+      offspring = set()
+      for rn in reverse_nodes:
+        offspring |= self.reverse_depends(rn, recursive=True)
+      reverse_nodes |= offspring
+    return reverse_nodes
 
   @deprecated("Unreasonable method, will be removed in future")
   def get_task_info(self):
@@ -224,6 +243,10 @@ class TopologicalGraph(object):
       step = int(part[2])
     else:
       step = 1
+
+    if not 0 <= start <= stop < len(self._m_node_info):
+      raise ValueError("node '%s' is not at the range of graph size %d" % (
+        range_str, len(self._m_node_info)))
     return list(range(start, stop + 1, step))
 
   def __parse_node(self, node):
@@ -340,8 +363,18 @@ class DynamicTopologicalGraph(TopologicalGraph):
       self._m_node_info[depend_node]["depends"].remove(node)
     self._m_is_latest = False
 
-  def top(self, max_nodes_num):
+  def top(self, max_nodes_num=-1):
+    """Fetch max_nodes_num of ready nodes.
+
+    Parameters
+    ----------
+    max_nodes_num: int
+      Maximun number of nodes to return.
+    """
+
     self._update_queue()
+    if max_nodes_num < 0:
+      return self._m_ready_nodes[:]
     return self._m_ready_nodes[:max_nodes_num]
 
   def _update_queue(self):

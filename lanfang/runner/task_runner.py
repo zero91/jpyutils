@@ -178,7 +178,7 @@ class TaskRunner(threading.Thread):
       input_params)
 
     # Execute Pre-Hook
-    self.__execute_pre_hook()
+    self.__execute_pre_hook(input_params)
 
     target_ret_value = None
     last_exitcode = None
@@ -273,7 +273,7 @@ class TaskRunner(threading.Thread):
       if self._m_share_dict_lock is not None:
         self._m_share_dict_lock.release()
 
-  def __execute_pre_hook(self):
+  def __execute_pre_hook(self, input_params):
     if isinstance(self._target, str):
       target = shlex.split(self._target)
     else:
