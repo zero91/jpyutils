@@ -2,11 +2,11 @@ from setuptools import setup, find_packages
 
 setup(
   name='lanfang',
-  version='0.1.2',
+  version='0.1.3',
   description='Make daily work and learning more efficient',
   author='Donald Cheung',
   author_email='jianzhang9102@gmail.com',
-  packages=find_packages(include=["lanying*"]),
+  packages=find_packages(include=["lanfang*"]),
   url="https://github.com/zero91/lanfang",
   python_requires='>=3.5',
   install_requires=[

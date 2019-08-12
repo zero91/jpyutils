@@ -18,5 +18,19 @@
 
 ### Python Packaging Tools
 
+#### Reference
+
 - [Packaging Python Projects](https://packaging.python.org/tutorials/packaging-projects/)
 
+#### Method
+
+```shell
+pip install --user --upgrade setuptools wheel
+python setup.py sdist bdist_wheel
+
+pip install --upgrade twine
+# test server
+twine upload --repository-url https://test.pypi.org/legacy/ dist/*
+# production server
+twine upload dist/*
+```
