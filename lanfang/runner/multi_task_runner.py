@@ -296,7 +296,11 @@ class MultiTaskRunner(object):
       self._m_params = MultiTaskParams(params, global_params)
     else:
       self._m_params = None
+
     self._m_params_max_checkpoint_num = params_max_checkpoint_num
+    if self._m_params_max_checkpoint_num <= 0:
+      raise ValueError(
+          "Parameter 'params_max_checkpoint_num' must be a postive integer")
 
     if displayer is None:
       self._m_displayer_class = TableDisplay
@@ -651,8 +655,8 @@ class MultiTaskRunner(object):
         if params_fname_pattern.match(fname):
           checkpoints.append(fname)
       checkpoints.sort(reverse=True)
-      for fname in checkpoints[self._m_params_max_checkpoint_num:]:
-        os.remove(fname)
+      for fname in checkpoints[self._m_params_max_checkpoint_num - 1 : ]:
+        os.remove(os.path.join(save_path, fname))
 
     time_stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     save_fname = os.path.join(save_path, "%s.json" % (time_stamp))

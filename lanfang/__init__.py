@@ -1,6 +1,6 @@
 """A toolkit to make daily work and learning more efficient.
 """
-__version__ = "0.1.2"
+__version__ = "0.1.3-dev"
 
 import re
 import warnings
