@@ -205,6 +205,12 @@ class ArgumentParser(argparse.ArgumentParser):
         if key in required_params:
           required_params.remove(key)
 
+    default_params = set()
+    for param in required_params:
+     if getattr(args, param) is not None:
+       default_params.add(param)
+    required_params -= default_params
+
     if len(required_params) > 0:
       raise ValueError("The following arguments are required: %s" % (
           ", ".join(required_params)))
