@@ -180,19 +180,35 @@ class ArgumentParser(argparse.ArgumentParser):
   def __init__(self, **params):
     """Receive the same parameters as argparse.ArgumentParser"""
     super(self.__class__, self).__init__(**params)
+    self._m_required_params = set()
 
-  def parse_args(self, args=None, namespace=None):
-    args = super(self.__class__, self).parse_args()
+  def add_argument(self, *args, **kwargs):
+    parameter = self._get_optional_kwargs(*args, **kwargs)
+    if parameter.get("required") is True:
+      self._m_required_params.add(parameter["dest"])
+      kwargs["required"] = False
 
+    return super(self.__class__, self).add_argument(*args, **kwargs)
+
+  def parse_known_args(self, args=None, namespace=None):
+    args, argv = super(self.__class__, self).parse_known_args()
+
+    required_params = copy.deepcopy(self._m_required_params)
     params = os.environ.get("TASK_RUNNER_PARAMETERS")
     if params is not None:
       params = json.loads(params)
-      if instance(params, dict):
+      if not isinstance(params, dict):
         raise ValueError(
           "Environment variable 'TASK_RUNNER_PARAMETERS' must be a dict.")
       for key, value in params.items():
         setattr(args, key, value)
-    return args
+        if key in required_params:
+          required_params.remove(key)
+
+    if len(required_params) > 0:
+      raise ValueError("The following arguments are required: %s" % (
+          ", ".join(required_params)))
+    return args, argv
 
 
 class MultiTaskParamsAnalyzer(object):
