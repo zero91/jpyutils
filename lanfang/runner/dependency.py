@@ -2,6 +2,7 @@ from lanfang.utils import deprecated
 import copy
 import collections
 import re
+import logging
 
 
 class TopologicalGraph(object):

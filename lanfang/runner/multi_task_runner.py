@@ -611,7 +611,10 @@ class MultiTaskRunner(object):
 
     self._dump_run_params()
     verbose and disp.write(refresh=True)
-    return 0
+    if len(failed_tasks) > 0:
+      return 1
+    else:
+      return 0
 
   def __kill_signal_handler(self, signum, stack):
     self.terminate()
