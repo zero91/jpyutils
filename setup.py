@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
   name='lanfang',
-  version='0.1.3',
+  version='0.1.4',
   description='Make daily work and learning more efficient',
   author='Donald Cheung',
   author_email='jianzhang9102@gmail.com',
