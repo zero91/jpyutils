@@ -1,6 +1,6 @@
 #TODO:
 # 1. Add voluptuous.infer function to infer value type from default values.
-#
+# 2. Add a parameter to add extra task dependent relations for TaskRegister.spawn.
 
 from lanfang import runner
 
@@ -22,7 +22,14 @@ class TaskSchema(object):
     Parameters
     ----------
     locals: dict
-      Maintain local parameters, format (param_name, param_type).
+      Maintain local parameters, format (param_name, param_type), e.g.
+      {
+        "name": str,
+        "save_path": filename
+      }
+      The 'filename' above is a callable object which receive a value
+      and return the transformed value, raise exception if anything
+      does not accord with the requirement.
 
     globals: dict
       Maintain global parameters which will be shared with other tasks,
@@ -82,7 +89,10 @@ class TaskSchema(object):
 
 
 class TaskRegister(object):
-  __tasks__ = []
+  """Tools for register task and manage multiple tasks automatically.
+  """
+
+  __tasks__ = [] # Save information of all registered tasks.
 
   def __init__(self, output_schema, *,
                      name=None,
@@ -94,7 +104,32 @@ class TaskRegister(object):
                      append_log=False,
                      input_default=None,
                      output_default=None):
+    """
+    Parameters
+    ----------
+    output_schema: dict, TaskSchema
+      The output schema of the task.  If it is a dict,
+      it will be passed as the 'globals' parameter of TaskSchema.
 
+    input_schema: dict, TaskSchema [optional]
+      The input schema of the task.
+
+    input_default: dict
+      The default input value of the task, e.g.
+        {
+          "name": "Tony",
+          "age": 21
+        }
+
+    output_default: dict
+      The default output value of the task.
+
+    Notes
+    -----
+    Those parameters not specified in this doc was from 'MultiTaskRunner.add',
+    see the doc if needed.
+
+    """
     if isinstance(output_schema, TaskSchema):
       self._m_output_schema = output_schema
     else:
@@ -133,9 +168,13 @@ class TaskRegister(object):
     self._m_task = None
 
   def __call__(self, target, **kwargs):
+    """Used to register a task as a decorator.
+    """
     return self.register(target, **kwargs)
 
   def register(self, target, **kwargs):
+    """Register a task.
+    """
     if self._m_task is not None:
       raise RuntimeError("Only one task can be registered.")
     self._m_task = {}
@@ -234,6 +273,60 @@ class TaskRegister(object):
 
   @classmethod
   def spawn(cls, feed_dict={}, signature_map=None, runner_creater=None):
+    """Create a multiple task runner instance to manage the registered tasks.
+
+    Parameters
+    ----------
+    feed_dict: dict
+      A feed dict which contain all the parameters
+      needed to run all the tasks, e.g.
+      {
+        "name": "Tony",
+        "age": 21
+      }
+
+    signature_map: dict
+      TaskRegister will match the global parameters and output values
+      of all tasks. For example,
+
+        task A have a global input parameter 'training_data',
+        task B will output a value which have a key 'training_data',
+
+      TaskRegister will find the fact and think task A is depend on task B,
+      and will get the value of input parameter 'training_data' from the
+      output of task B.
+
+      But sometimes it didn't work, different task may name the same
+      meaning of values with different names. 'signature_map' is here to
+      bridge the gap between different task with different naming conventions.
+      If task B output a key 'train_data' with the same meaning as before,
+      for example, but we still want the previous match, we can inform the
+      register that 'train_data' should be mapped to 'training_data'.
+      So we have
+
+        signature_map = {
+          "A": (None, None),
+          "B": (None, {"train_data": "training_data"}
+        }
+
+      Each value of 'signature_map' is a two pair tuple (input_mapping_dict,
+      output_mapping_dict). Each of them contains the mapping
+      from the actual name of input/output parameters to the name needed.
+      So the above example of 'signature_map' means we want the item
+      "train_data" from the output of task B be matched use the name
+      "training_data".
+
+    runner_creater: callable object
+      A callable object which returns an instance for manage
+      all the registered tasks. The callable object will get a
+      parameter 'task_params' which contains the parameters of all the tasks.
+
+    Returns
+    -------
+    scheduler: MultiTaskRunner
+      An instance to manage all the registered tasks.
+
+    """
     helper = _TaskRegisterHelper(cls, signature_map)
 
     task_params, required_params, task_relations = helper.analysis()
@@ -284,7 +377,7 @@ class _TaskRegisterHelper(object):
 
     new_signature_map = {}
     for task_name, (input_map, output_map) in signature_map.items():
-      if input_map is None: 
+      if input_map is None:
         input_map = {}
       if not isinstance(input_map, dict):
         raise TypeError("input map of task '%s' must be a dict, "
