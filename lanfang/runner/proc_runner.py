@@ -56,7 +56,7 @@ class ProcRunner(Runner, multiprocessing.Process):
       run_handler = signal.getsignal(signum)
       if self._m_signal_handler[signum] == run_handler:
         continue
-      logging.warning("Recover handler of signal %s from %s to %s",
+      logging.info("Recover handler of signal %s from %s to %s",
           signum, run_handler, self._m_signal_handler[signum])
       signal.signal(signum, self._m_signal_handler[signum])
 
