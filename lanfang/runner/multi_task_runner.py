@@ -64,6 +64,11 @@ class MultiTaskParams(object):
   def shared_params(self):
     return self._m_shared_params
 
+  @property
+  def params(self):
+    self.update()
+    return copy.deepcopy(self._m_params)
+
   def update(self):
     if hash(self._m_shared_params) == self._m_shared_params_hash:
       return
@@ -78,7 +83,7 @@ class MultiTaskParams(object):
 
     self.update()
     if debug is True:
-      params = self._m_share_params.copy()
+      params = self._m_shared_params.copy()
     else:
       params = self._m_params
 
@@ -203,7 +208,7 @@ class MultiTaskRunner(object):
     Class which can display tasks information.
 
   """
-  def __init__(self, log_path=None, parallel_degree=-1, retry=1, interval=5,
+  def __init__(self, *, log_path=None, parallel_degree=-1, retry=1, interval=5,
                      params=None, global_params=None, render_arguments=None,
                      params_max_checkpoint_num=3, displayer=None):
     if log_path is not None:
@@ -244,6 +249,12 @@ class MultiTaskRunner(object):
     else:
       self._m_displayer_class = displayer
 
+  @property
+  def run_params(self):
+    if self._m_params is None:
+      return None
+    return self._m_params.params
+
   def __del__(self):
     try:
       for f in self._m_open_file_list:
@@ -251,9 +262,9 @@ class MultiTaskRunner(object):
     except:
       return
 
-  def add(self, target, name=None, args=(), kwargs={},
+  def add(self, target, *, name=None, args=(), kwargs={},
                         pre_hooks=None, post_hooks=None,
-                        depends=None, encoding="utf-8", daemon=True,
+                        depends=None, encoding="utf-8", daemon=None,
                         append_log=False, **popen_kwargs):
     """Add a new task.
 
@@ -391,12 +402,12 @@ class MultiTaskRunner(object):
     with open(tasks_fname, mode='r', encoding=encoding) as ftask:
       return self.adds(self._render_arguments(ftask.read()))
 
-  def lists(self, display=False):
+  def lists(self, *, verbose=False):
     """List all tasks.
 
     Parameters
     ----------
-    display: boolean
+    verbose: boolean
       Set True if you want to display the tasks info on the screen.
 
     Returns
@@ -412,7 +423,7 @@ class MultiTaskRunner(object):
     if not self._m_dependency.is_valid():
       raise ValueError("The dependency relations of tasks is not topological")
 
-    if display is True:
+    if verbose is True:
       self._m_displayer_class(
         self._m_dependency, self._m_runner_dict).write()
     return self._m_dependency.get_nodes(order=True)
