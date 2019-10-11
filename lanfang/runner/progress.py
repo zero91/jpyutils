@@ -1,4 +1,4 @@
-from lanfang.runner.common import TaskStatus
+from lanfang.runner.base import RunnerStatus
 from lanfang.utils import terminal
 
 import collections
@@ -7,14 +7,14 @@ import datetime
 
 
 _TASK_STATUS_COLOR_MAP = {
-  TaskStatus.DISABLED : ("Disabled", "black",  None),
-  TaskStatus.WAITING  : ("Waiting",  "cyan",   None),
-  TaskStatus.READY    : ("Ready",    "blue",   None),
-  TaskStatus.RUNNING  : ("Running",  "yellow", None),
-  TaskStatus.DONE     : ("Done",     "green",  None),
-  TaskStatus.FAILED   : ("Failed",   "red",    None),
-  TaskStatus.KILLED   : ("Killed",   "purple", None),
-  TaskStatus.CANCELED : ("Canceled", "red",    None)
+  RunnerStatus.DISABLED : ("Disabled", "black",  None),
+  RunnerStatus.WAITING  : ("Waiting",  "cyan",   None),
+  RunnerStatus.READY    : ("Ready",    "blue",   None),
+  RunnerStatus.RUNNING  : ("Running",  "yellow", None),
+  RunnerStatus.DONE     : ("Done",     "green",  None),
+  RunnerStatus.FAILED   : ("Failed",   "red",    None),
+  RunnerStatus.KILLED   : ("Killed",   "purple", None),
+  RunnerStatus.CANCELED : ("Canceled", "red",    None)
 }
 
 
@@ -33,8 +33,8 @@ class TableDisplay(object):
           "runner": runner
         }
       }
-  """
 
+  """
   def __init__(self, dependency, runner_dict, update_interval=1200):
     if len(runner_dict) == 0:
       raise ValueError("No task exists, please check")
@@ -45,7 +45,7 @@ class TableDisplay(object):
 
     self._m_running_tasks = set()
     for task_name, runner in self._m_runner_dict.items():
-      if runner["status"] != TaskStatus.DISABLED:
+      if runner["status"] != RunnerStatus.DISABLED:
         self._m_running_tasks.add(task_name)
 
     self._m_task2str = collections.defaultdict(str)
@@ -67,7 +67,7 @@ class TableDisplay(object):
       'status': 8,
       'start_time': 14, # format: mm.dd HH:MM:SS
       'elapsed_time': 9,
-      'try': 3
+      'attempts': 3
     }
     return column_length
 
@@ -127,7 +127,7 @@ class TableDisplay(object):
 
   def __fetch_task_str(self, task_name):
     status = self._m_runner_dict[task_name]["status"]
-    task_info = self._m_runner_dict[task_name]["runner"].info
+    task = self._m_runner_dict[task_name]["runner"]
 
     task_show_str_list = list()
 
@@ -143,7 +143,7 @@ class TableDisplay(object):
     # column 3. Task Status.
     task_show_str_list.append('|')
     highlight = True
-    if status == TaskStatus.DONE:
+    if status == RunnerStatus.DONE:
       self._m_running_tasks.discard(task_name)
 
     status_desc, font_color, bg_color = _TASK_STATUS_COLOR_MAP[status]
@@ -152,15 +152,15 @@ class TableDisplay(object):
       font_color=font_color, bg_color=bg_color, highlight=highlight)
     task_show_str_list.append(status_desc_str)
 
-    if task_info['start_time'] is not None:
+    if task.start_time is not None:
       # column 4. Task Start Time.
       task_show_str_list.append('|')
-      start_time = datetime.datetime.fromtimestamp(task_info['start_time'])
+      start_time = datetime.datetime.fromtimestamp(task.start_time)
       task_show_str_list.append(start_time.strftime("%m.%d %H:%M:%S"))
 
       # column 5. Task Elapsed Time.
       task_show_str_list.append('|')
-      elapsed_time = task_info['elapsed_time']
+      elapsed_time = task.elapsed_time
       if elapsed_time is None:
         elapsed_time = 0.0
       task_show_str_list.append(
@@ -168,10 +168,11 @@ class TableDisplay(object):
 
       # column 6. Task Retry Info.
       task_show_str_list.append('|')
+      attempts_info = "{}/{}".format(*task.attempts)
       task_show_str_list.append(
-        task_info['try'].ljust(self._m_column_length['try']))
+        attempts_info.ljust(self._m_column_length['attempts']))
 
-    if status in [TaskStatus.WAITING, TaskStatus.CANCELED]:
+    if status in [RunnerStatus.WAITING, RunnerStatus.CANCELED]:
       # [optional] column 4. Task Depends Info if needed.
       task_show_str_list.append('|')
       depends = self._m_running_tasks & self._m_dependency.depends(task_name)

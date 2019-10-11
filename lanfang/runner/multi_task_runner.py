@@ -1,4 +1,4 @@
-from lanfang.runner.common import TaskStatus
+from lanfang.runner.base import SharedData, SharedScope, RunnerStatus
 from lanfang.runner.task_runner import TaskRunner
 from lanfang.runner.proc_runner import ProcRunner
 from lanfang.runner.progress import TableDisplay
@@ -8,18 +8,17 @@ import time
 import signal
 import re
 import os
+import sys
 import collections
 import copy
 import json
 import logging
-import hashlib
 import datetime
-import multiprocessing
-import argparse
 
 
 class MultiTaskParams(object):
-  """Shared parameters between multiple processes"""
+  """Shared parameters between multiple runners."""
+
   __GLOBAL_KEY__ = "__parameters__"
 
   def __init__(self, params, global_params=None, global_key=__GLOBAL_KEY__):
@@ -35,6 +34,7 @@ class MultiTaskParams(object):
 
     global_key: str
       The key name to access global parameters.
+
     """
     self._m_global_key = global_key
 
@@ -56,32 +56,21 @@ class MultiTaskParams(object):
       else:
         raise TypeError("Parameter 'global_params' is not a dict")
 
-    self._m_manager = multiprocessing.Manager()
-    self._m_share_params = self._m_manager.dict()
-    self._m_share_params_lock = multiprocessing.Lock()
-    self._m_share_params_hash = None
+    self._m_shared_params = SharedData(shared_scope=SharedScope.PROCESS)
+    self._m_shared_params_hash = None
     self._render_params2share()
 
   @property
-  def share_params(self):
-    return self._m_share_params
-
-  @property
-  def share_params_lock(self):
-    return self._m_share_params_lock
+  def shared_params(self):
+    return self._m_shared_params
 
   def update(self):
-    self._m_share_params_lock.acquire()
-    try:
-      new_share_params_hash = self.__share_params_hashcode()
-      if new_share_params_hash == self._m_share_params_hash:
-        return
-      self._render_share2params()
-      self._render_params2share()
-    finally:
-      self._m_share_params_lock.release()
+    if hash(self._m_shared_params) == self._m_shared_params_hash:
+      return
+    self._render_share2params()
+    self._render_params2share()
 
-  def dump(self, fname, debug=False):
+  def dump(self, fname, *, debug=False):
     fname = os.path.realpath(fname)
     save_path = os.path.dirname(fname)
     if not os.path.exists(save_path):
@@ -97,58 +86,58 @@ class MultiTaskParams(object):
       json.dump(params, fout, sort_keys=True, indent=2)
 
   def _render_params2share(self):
-    # Output
+    shared_params = {}
+
+    # Find all output values
     output_dict = {}
-    share_params = {}
     for name, params in self._m_params.items():
       if name == self._m_global_key:
         continue
-      share_params[name] = {"output": copy.deepcopy(params["output"])}
+      shared_params[name] = {"output": copy.deepcopy(params["output"])}
       for item_name, item_value in params["output"].items():
         output_dict[name + "." + item_name] = item_value
 
-    # Input
+    # Set input parameters according to the output values.
     for name, params in self._m_params.items():
       if name == self._m_global_key:
         continue
-      share_params[name]["input"] = {}
+      shared_params[name]["input"] = {}
       for item, item_scope in params["input"].items():
         if not isinstance(item_scope, list):
-          share_params[name]["input"][item] = \
+          shared_params[name]["input"][item] = \
               self.__get_params_item(item_scope, output_dict)
         else:
-          item_list = list()
+          item_list = []
           for scope in item_scope:
             item_list.append(self.__get_params_item(scope, output_dict))
-          share_params[name]["input"][item] = item_list
+          shared_params[name]["input"][item] = item_list
 
-    self._m_share_params.clear()
-    self._m_share_params.update(share_params)
-    self._m_share_params_hash = self.__share_params_hashcode()
+    self._m_shared_params.clear()
+    self._m_shared_params.update(shared_params)
+    self._m_shared_params_hash = hash(self._m_shared_params)
 
   def _render_share2params(self):
-    share_params = self._m_share_params.copy()
     for name, params in self._m_params.items():
-      if name == self._m_global_key or name not in share_params:
+      if name == self._m_global_key or name not in self._m_shared_params:
         continue
 
-      if not isinstance(share_params[name]["output"], dict):
+      if not isinstance(self._m_shared_params[name]["output"], dict):
         logging.warning("Task '%s' did not return a dict, it returned [%s]",
-            name, share_params[name]["output"])
+            name, self._m_shared_params[name]["output"])
         continue
 
+      output_values = self._m_shared_params[name]["output"]
       for item in params["output"]:
-        if item not in share_params[name]["output"]:
+        if item not in output_values:
           logging.warning("Task '%s' did not output expected item [%s]",
             name, item)
           continue
-        self._m_params[name]["output"][item] = \
-            share_params[name]["output"][item]
-        share_params[name]["output"].pop(item)
+        self._m_params[name]["output"][item] = output_values[item]
+        output_values.pop(item)
 
-      if len(share_params[name]["output"]) > 0:
+      if len(output_values) > 0:
         logging.warning("Task '%s' output unexpected values [%s]",
-          name, json.dumps(share_params[name]["output"]))
+          name, json.dumps(output_values))
 
   def __get_params_item(self, scope, output_dict=None):
     try:
@@ -156,8 +145,10 @@ class MultiTaskParams(object):
       if output_dict is not None and scope in output_dict:
         return output_dict[scope]
 
+      # Find parameter in global scope.
       name_scope_list = scope.split('.')
-      if len(name_scope_list) == 0 or name_scope_list[0] != self._m_global_key:
+      if len(name_scope_list) == 0 or \
+            name_scope_list[0] != self._m_global_key:
         name_scope_list.insert(0, self._m_global_key)
 
       params = self._m_params
@@ -166,82 +157,6 @@ class MultiTaskParams(object):
       return copy.deepcopy(params)
     except Exception as e:
       return copy.deepcopy(scope)
-
-  def __share_params_hashcode(self):
-    share_params_str = json.dumps(self._m_share_params.copy(), sort_keys=True)
-    return hashlib.md5(share_params_str.encode("utf-8")).hexdigest()
-
-
-class ArgumentParser(argparse.ArgumentParser):
-  """A wrapper class of argparse.ArgumentParser
-  which parse parameters from environment variables.
-  """
-
-  def __init__(self, **params):
-    """Receive the same parameters as argparse.ArgumentParser"""
-    super(self.__class__, self).__init__(**params)
-    self._m_required_params = set()
-
-  def add_argument(self, *args, **kwargs):
-    parameter = self._get_optional_kwargs(*args, **kwargs)
-    if parameter.get("required") is True:
-      self._m_required_params.add(parameter["dest"])
-      kwargs["required"] = False
-
-    return super(self.__class__, self).add_argument(*args, **kwargs)
-
-  def parse_known_args(self, args=None, namespace=None):
-    args, argv = super(self.__class__, self).parse_known_args()
-
-    required_params = copy.deepcopy(self._m_required_params)
-    params = os.environ.get("TASK_RUNNER_PARAMETERS")
-    if params is not None:
-      params = json.loads(params)
-      if not isinstance(params, dict):
-        raise ValueError(
-          "Environment variable 'TASK_RUNNER_PARAMETERS' must be a dict.")
-      for key, value in params.items():
-        setattr(args, key, value)
-        if key in required_params:
-          required_params.remove(key)
-
-    default_params = set()
-    for param in required_params:
-     if getattr(args, param) is not None:
-       default_params.add(param)
-    required_params -= default_params
-
-    if len(required_params) > 0:
-      raise ValueError("The following arguments are required: %s" % (
-          ", ".join(required_params)))
-    return args, argv
-
-
-class MultiTaskParamsAnalyzer(object):
-  """TODO: Shared parameters between multiple processes need to be
-  edited by hand for programmers. It's an awful experience!
-  Need to provide some tools to easy this progress.
-  """
-  def __init__(self, signature=None):
-    signature = {
-      "train.input.schema_uri": "evaluate.output.uri",
-    }
-
-  def add_cmd(self, cmd):
-    pass
-
-  def add_func(self, target):
-    pass
-
-
-class PreHookCallback(object):
-  """TODO: Add input parameters type check"""
-  pass
-
-
-class PostHookCallback(object):
-  """TODO: Add result check"""
-  pass
 
 
 class MultiTaskRunner(object):
@@ -292,7 +207,7 @@ class MultiTaskRunner(object):
                      params=None, global_params=None, render_arguments=None,
                      params_max_checkpoint_num=3, displayer=None):
     if log_path is not None:
-      self._m_log_path = os.path.realpath(log_path)
+      self._m_log_path = os.path.normpath(log_path)
     else:
       self._m_log_path = None
 
@@ -330,11 +245,14 @@ class MultiTaskRunner(object):
       self._m_displayer_class = displayer
 
   def __del__(self):
-    for f in self._m_open_file_list:
-      f.close()
+    try:
+      for f in self._m_open_file_list:
+        f.close()
+    except:
+      return
 
   def add(self, target, name=None, args=(), kwargs={},
-                        pre_hook=None, post_hook=None,
+                        pre_hooks=None, post_hooks=None,
                         depends=None, encoding="utf-8", daemon=True,
                         append_log=False, **popen_kwargs):
     """Add a new task.
@@ -355,12 +273,12 @@ class MultiTaskRunner(object):
       The dictionary of keyword arguments for the target invocation.
       Defaults to {}.
 
-    pre_hook: callable
-      A callable object to be invoked before 'target' execution.
+    pre_hooks: list of callable objects
+      A list of callable objects to be invoked before 'target' execution.
       The input parameters is the same as 'target'.
 
-    post_hook: callable
-      A callable object to be invoked after 'target' execution.
+    post_hooks: list of callable objects
+      A list of callable objects to be invoked after 'target' execution.
       The input parameters is the return value of calling 'target'.
 
     depends: str, list, set, dict
@@ -408,37 +326,25 @@ class MultiTaskRunner(object):
         popen_kwargs[sname] = open(log_fname, open_tag)
         self._m_open_file_list.append(popen_kwargs[sname])
 
-    share_params = None
-    share_params_lock = None
+    shared_params = None
     if self._m_params is not None:
-      share_params = self._m_params.share_params
-      share_params_lock = self._m_params.share_params_lock
+      shared_params = self._m_params.shared_params
 
     if callable(target):
       runner = ProcRunner(
         target, name=name, args=args, kwargs=kwargs,
-        retry=self._m_retry,
-        interval=self._m_interval,
-        daemon=daemon,
-        pre_hook=pre_hook,
-        post_hook=post_hook,
-        share_dict=share_params,
-        share_dict_lock=share_params_lock,
-        **popen_kwargs)
+        retry=self._m_retry, interval=self._m_interval, daemon=daemon,
+        pre_hooks=pre_hooks, post_hooks=post_hooks,
+        shared_data=shared_params, **popen_kwargs)
     else:
       runner = TaskRunner(
-        target, name=name, retry=self._m_retry,
-        interval=self._m_interval,
-        daemon=daemon,
-        pre_hook=pre_hook,
-        post_hook=post_hook,
-        share_dict=share_params,
-        share_dict_lock=share_params_lock,
-        encoding=encoding,
-        **popen_kwargs)
+        target, name=name,
+        retry=self._m_retry, interval=self._m_interval, daemon=daemon,
+        pre_hooks=pre_hooks, post_hooks=post_hooks,
+        shared_data=shared_params, encoding=encoding, **popen_kwargs)
 
     self._m_runner_dict[runner.name] = {
-      "status": TaskStatus.WAITING,
+      "status": RunnerStatus.WAITING,
       "runner": runner,
     }
     self._m_dependency.add(runner.name, depends)
@@ -485,7 +391,7 @@ class MultiTaskRunner(object):
     with open(tasks_fname, mode='r', encoding=encoding) as ftask:
       return self.adds(self._render_arguments(ftask.read()))
 
-  def lists(self, display=True):
+  def lists(self, display=False):
     """List all tasks.
 
     Parameters
@@ -540,8 +446,8 @@ class MultiTaskRunner(object):
     Notes
     -----
     Should only be executed only once.
-    """
 
+    """
     if self._m_started:
       raise RuntimeError("cannot run %s twice" % (self.__class__.__name__))
 
@@ -556,7 +462,7 @@ class MultiTaskRunner(object):
     run_nodes = set(run_dependency.get_nodes())
     for task_name in self._m_runner_dict:
       if task_name not in run_nodes:
-        self._m_runner_dict[task_name]["status"] = TaskStatus.DISABLED
+        self._m_runner_dict[task_name]["status"] = RunnerStatus.DISABLED
 
     if verbose:
       disp = self._m_displayer_class(self._m_dependency, self._m_runner_dict)
@@ -569,15 +475,15 @@ class MultiTaskRunner(object):
     while True:
       for task_name in run_dependency.top():
         if self._m_runner_dict[task_name]["status"] not in [
-            TaskStatus.READY, TaskStatus.WAITING]:
+            RunnerStatus.READY, RunnerStatus.WAITING]:
           continue
         if self._m_parallel_degree < 0 \
             or len(self._m_running_tasks) < self._m_parallel_degree:
           self._m_running_tasks.add(task_name)
-          self._m_runner_dict[task_name]["status"] = TaskStatus.RUNNING
+          self._m_runner_dict[task_name]["status"] = RunnerStatus.RUNNING
           self._m_runner_dict[task_name]["runner"].start()
         else:
-          self._m_runner_dict[task_name]["status"] = TaskStatus.READY
+          self._m_runner_dict[task_name]["status"] = RunnerStatus.READY
 
       for task_name in self._m_running_tasks.copy():
         if self._m_runner_dict[task_name]["runner"].is_alive():
@@ -586,16 +492,17 @@ class MultiTaskRunner(object):
 
         exitcode = self._m_runner_dict[task_name]["runner"].exitcode
         if exitcode != 0:
-          self._m_runner_dict[task_name]["status"] = TaskStatus.FAILED
-          logging.critical("Task %s failed, exit code %d", task_name, exitcode)
+          self._m_runner_dict[task_name]["status"] = RunnerStatus.FAILED
+          logging.critical("Task %s failed, exit with code '%s'",
+              task_name, exitcode)
 
           failed_tasks.add(task_name)
           offspring = run_dependency.reverse_depends(task_name, recursive=True)
           failed_tasks |= offspring
           for name in offspring:
-            self._m_runner_dict[name]["status"] = TaskStatus.CANCELED
+            self._m_runner_dict[name]["status"] = RunnerStatus.CANCELED
         else:
-          self._m_runner_dict[task_name]["status"] = TaskStatus.DONE
+          self._m_runner_dict[task_name]["status"] = RunnerStatus.DONE
           if self._m_params is not None:
             self._m_params.update()
           succeed_tasks.add(task_name)
@@ -605,7 +512,7 @@ class MultiTaskRunner(object):
       if len(succeed_tasks) + len(failed_tasks) == len(run_nodes):
         break
       if not try_best and len(failed_tasks) > 0:
-        self.terminate()
+        self.stop()
         break
       time.sleep(0.1)
 
@@ -617,18 +524,17 @@ class MultiTaskRunner(object):
       return 0
 
   def __kill_signal_handler(self, signum, stack):
-    self.terminate()
+    self.stop()
     self._m_displayer_class(self._m_dependency, self._m_runner_dict).write()
-    logging.info("Receive signal %d, "\
-      "all running processes are killed.", signum)
-    exit(1)
+    logging.warning("Receive signal %s, all runners are killed.", signum)
+    sys.exit(1)
 
-  def terminate(self):
-    """Terminate all running processes."""
+  def stop(self):
+    """Stop all runners."""
     for task_name in self._m_running_tasks.copy():
       try:
-        self._m_runner_dict[task_name]["runner"].terminate()
-        self._m_runner_dict[task_name]["status"] = TaskStatus.KILLED
+        self._m_runner_dict[task_name]["runner"].stop()
+        self._m_runner_dict[task_name]["status"] = RunnerStatus.KILLED
       finally:
         self._m_running_tasks.remove(task_name)
     self._dump_run_params()
