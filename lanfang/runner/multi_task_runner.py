@@ -1,6 +1,6 @@
 from lanfang.runner.base import SharedData, SharedScope, RunnerStatus
-from lanfang.runner.task_runner import TaskRunner
-from lanfang.runner.proc_runner import ProcRunner
+from lanfang.runner.cmd_runner import CmdRunner
+from lanfang.runner.func_process_runner import FuncProcessRunner
 from lanfang.runner.progress import TableDisplay
 from lanfang.runner.dependency import DynamicTopologicalGraph
 
@@ -342,13 +342,13 @@ class MultiTaskRunner(object):
       shared_params = self._m_params.shared_params
 
     if callable(target):
-      runner = ProcRunner(
+      runner = FuncProcessRunner(
         target, name=name, args=args, kwargs=kwargs,
         retry=self._m_retry, interval=self._m_interval, daemon=daemon,
         pre_hooks=pre_hooks, post_hooks=post_hooks,
         shared_data=shared_params, **popen_kwargs)
     else:
-      runner = TaskRunner(
+      runner = CmdRunner(
         target, name=name,
         retry=self._m_retry, interval=self._m_interval, daemon=daemon,
         pre_hooks=pre_hooks, post_hooks=post_hooks,
@@ -560,7 +560,7 @@ class MultiTaskRunner(object):
 
     Returns
     -------
-    runner: TaskRunner, ProcRunner
+    runner: CmdRunner, FuncProcessRunner
       Reference runner of 'task_name'.
 
     """

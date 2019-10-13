@@ -8,7 +8,7 @@ import multiprocessing
 import signal
 
 
-class ProcRunner(Runner, multiprocessing.Process):
+class FuncProcessRunner(Runner, multiprocessing.Process):
   """Execute a callable object in an independent process.
 
   Parameters

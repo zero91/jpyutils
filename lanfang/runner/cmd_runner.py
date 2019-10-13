@@ -14,7 +14,7 @@ import argparse
 __TASK_ENV_PARAMS__ = 'TASK_RUNNER_PARAMETERS'
 
 
-class TaskRunner(Runner, threading.Thread):
+class CmdRunner(Runner, threading.Thread):
   """Execute a command in an independent process
   and maintain the new created process in a thread.
 
