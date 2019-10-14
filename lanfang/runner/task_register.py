@@ -282,7 +282,9 @@ class TaskRegister(object):
     return func_schema, func_default
 
   @classmethod
-  def spawn(cls, feed_dict={}, signature_map=None, runner_creater=None):
+  def spawn(cls, feed_dict={}, subset=None,
+                               signature_map=None,
+                               runner_creater=None):
     """Create a multiple task runner instance to manage the registered tasks.
 
     Parameters
@@ -294,6 +296,9 @@ class TaskRegister(object):
         "name": "Tony",
         "age": 21
       }
+
+    subset: list, tuple, set
+      A subset of tasks to use.
 
     signature_map: dict
       TaskRegister will match the global parameters and output values
@@ -337,7 +342,8 @@ class TaskRegister(object):
       An instance to manage all the registered tasks.
 
     """
-    helper = _TaskRegisterHelper(cls, signature_map)
+    helper = _TaskRegisterHelper(
+        cls, subset=subset, signature_map=signature_map)
 
     task_params, required_params, task_relations = helper.analysis()
 
@@ -367,16 +373,26 @@ class TaskRegister(object):
       scheduler = runner.MultiTaskRunner(params=task_params)
 
     for task in cls.__tasks__:
+      if subset is not None and task['name'] not in subset:
+        continue
       scheduler.add(depends=task_relations[task['name']], **task["exec_params"])
     return scheduler
 
 
 class _TaskRegisterHelper(object):
-  def __init__(self, register_cls, signature_map=None):
-    self._m_cls = register_cls
+  def __init__(self, register_cls, *, subset=None, signature_map=None):
+    self._m_tasks = self._extract_subset_tasks(register_cls, subset)
     self._m_global_params_key = \
         runner.multi_task_runner.MultiTaskParams.__GLOBAL_KEY__
     self._m_signature_map = self._parse_signature_map(signature_map)
+
+  def _extract_subset_tasks(self, register_cls, subset):
+    subset_tasks = []
+    for task in register_cls.__tasks__:
+      if subset is not None and task['name'] not in subset:
+        continue
+      subset_tasks.append(copy.deepcopy(task))
+    return subset_tasks
 
   def _parse_signature_map(self, signature_map):
     if signature_map is None:
@@ -408,7 +424,7 @@ class _TaskRegisterHelper(object):
 
   def _check_signature_map(self, signature_map):
     signature_map = copy.deepcopy(signature_map)
-    for task in self._m_cls.__tasks__:
+    for task in self._m_tasks:
       if task['name'] not in signature_map:
         continue
 
@@ -448,7 +464,7 @@ class _TaskRegisterHelper(object):
     """Extract basic input and output parameters from all tasks.
     """
     task_params = {self._m_global_params_key: {}}
-    for task in self._m_cls.__tasks__:
+    for task in self._m_tasks:
       if task["input_schema"] is None:
         inputs = {}
       else:
@@ -476,7 +492,7 @@ class _TaskRegisterHelper(object):
     """
     task_params = copy.deepcopy(task_params)
     task_relations = {}
-    for task in self._m_cls.__tasks__:
+    for task in self._m_tasks:
       task_relations[task["name"]] = []
       if task["input_schema"] is None:
         continue
@@ -506,7 +522,7 @@ class _TaskRegisterHelper(object):
     param_map_name = self._find_map_name(task_name, io_type, param_name)
 
     tasks = []
-    for task in self._m_cls.__tasks__:
+    for task in self._m_tasks:
       if task['name'] == task_name:
         continue
       for out in task["output_schema"].globals:
@@ -530,7 +546,7 @@ class _TaskRegisterHelper(object):
     for param in task_params[self._m_global_params_key]:
       default_values = []
 
-      for task in self._m_cls.__tasks__:
+      for task in self._m_tasks:
         for key, value in task_params[task["name"]]["input"].items():
           if value != param or key not in task["input_default"]:
             continue
@@ -546,7 +562,7 @@ class _TaskRegisterHelper(object):
         required_params.add(param)
 
     # set default values of local parameters
-    for task in self._m_cls.__tasks__:
+    for task in self._m_tasks:
       for key, value in task_params[task['name']]["input"].items():
         if value is not None: # not a local parameter
           continue

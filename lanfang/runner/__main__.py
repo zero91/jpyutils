@@ -42,6 +42,9 @@ def parse_args():
     "--print-params", action="store_true",
     help="Print the parameters of all the tasks")
 
+  parser.add_argument(
+    "--tasks", nargs="+", help="A subset of tasks to use.")
+
   return parser, parser.parse_args()
 
 
@@ -54,7 +57,7 @@ def main():
     feed_dict = json.loads(args.feed_values)
 
   runner.TaskLoader().load(args.start_dir)
-  scheduler = runner.TaskRegister.spawn(feed_dict=feed_dict)
+  scheduler = runner.TaskRegister.spawn(feed_dict=feed_dict, subset=args.tasks)
 
   if args.print_params:
     print("--------------- Initial Parameters -------------")
