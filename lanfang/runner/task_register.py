@@ -1,6 +1,7 @@
 #TODO:
 # 1. Add voluptuous.infer function to infer value type from default values.
-# 2. Add a parameter to add extra task dependent relations for TaskRegister.spawn.
+# 2. Add a parameter to add extra task dependent relations
+#    for TaskRegister.spawn.
 
 from lanfang import runner
 

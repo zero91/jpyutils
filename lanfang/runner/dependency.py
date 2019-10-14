@@ -213,7 +213,7 @@ class TopologicalGraph(object):
     nodes = []
     pattern = re.compile(pattern_str)
     for nd in self._m_node_info:
-      if pattern.match(nd):
+      if pattern.fullmatch(nd):
         nodes.append(self._m_node_info[nd]["order_id"])
     return nodes
 
