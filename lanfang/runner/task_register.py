@@ -191,6 +191,9 @@ class TaskRegister(object):
             "which is not allowed when the target is a command.")
       target, pre_hooks, post_hooks = self._add_cmd_task(target)
 
+    if self._is_task_exist(name):
+      raise ValueError("Find duplicate task '%s'." % (name))
+
     pre_hooks.extend(self._m_pre_hooks)
     post_hooks.extend(self._m_post_hooks)
 
@@ -209,6 +212,12 @@ class TaskRegister(object):
     }
     self.__tasks__.append(self._m_task)
     return target
+
+  def _is_task_exist(self, task_name):
+    for task in self.__class__.__tasks__:
+      if task_name == task["name"]:
+        return True
+    return False
 
   def _add_cmd_task(self, cmd):
     pre_hooks = []
