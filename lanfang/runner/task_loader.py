@@ -1,6 +1,7 @@
 """Loading tasks."""
 import re
 import os
+import sys
 import importlib.util
 
 # what about .pyc (etc)
@@ -18,7 +19,7 @@ class TaskLoader(object):
   def __init__(self):
     super(TaskLoader, self).__init__()
 
-  def load(self, start_dir, pattern='.*task(s?).py'):
+  def load(self, start_dir, pattern='.*task(s?)\.py'):
     """Load and register all tasks under directory 'start_dir'.
 
     Parameters
@@ -62,10 +63,12 @@ class TaskLoader(object):
     return name
 
   def _import_file(self, full_fname, start_dir):
+    sys.path.insert(0, os.path.dirname(full_fname))
     module_name = self._get_name_from_path(full_fname, start_dir)
 
     module_spec = importlib.util.spec_from_file_location(
         module_name, full_fname)
     module = importlib.util.module_from_spec(module_spec)
     module_spec.loader.exec_module(module)
+    sys.path.pop(0)
     return module
