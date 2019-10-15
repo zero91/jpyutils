@@ -91,8 +91,10 @@ class CmdRunner(Runner, threading.Thread):
     # Reset stdout temporarily to get process return value.
     if popen_kwargs.get("stdout") in [subprocess.PIPE, subprocess.DEVNULL]:
       stdout_stream = None
+    elif popen_kwargs.get("stdout") is None:
+      stdout_stream = sys.stdout
     else:
-      stdout_stream = popen_kwargs.get("stdout", sys.stdout)
+      stdout_stream = popen_kwargs.get("stdout")
     backup_stdout = popen_kwargs.get("stdout")
     popen_kwargs["stdout"] = subprocess.PIPE
 

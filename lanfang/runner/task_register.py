@@ -209,6 +209,7 @@ class TaskRegister(object):
       "append_log": self._m_append_log,
       "encoding": self._m_encoding,
       "daemon": self._m_daemon,
+      **kwargs
     }
     self.__tasks__.append(self._m_task)
     return target
