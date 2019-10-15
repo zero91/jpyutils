@@ -80,7 +80,7 @@ class TableDisplay(object):
     if hasattr(self, "_m_write_times") and self._m_write_times > 0:
       sys.stderr.write("\033[%dB" % (self._m_table_rows - self._m_cursor_pos))
 
-    if self._m_cursor_pos is not None:
+    if hasattr(self, "_m_cursor_po") and self._m_cursor_pos is not None:
       sys.stderr.write("\33[?25h")
 
   def write(self, refresh=False, out_stream=sys.stderr):
