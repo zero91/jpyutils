@@ -43,6 +43,9 @@ def parse_args():
     help="Print the parameters of all the tasks")
 
   parser.add_argument(
+    "--file-pattern", help="File name pattern of the tasks.")
+
+  parser.add_argument(
     "--tasks", nargs="+", help="A subset of tasks to use.")
 
   return parser, parser.parse_args()
@@ -56,7 +59,10 @@ def main():
   else:
     feed_dict = json.loads(args.feed_values)
 
-  runner.TaskLoader().load(args.start_dir)
+  if args.file_pattern is not None:
+    runner.TaskLoader().load(args.start_dir, args.file_pattern)
+  else:
+    runner.TaskLoader().load(args.start_dir)
   scheduler = runner.TaskRegister.spawn(feed_dict=feed_dict, subset=args.tasks)
 
   if args.print_params:

@@ -9,6 +9,7 @@ from lanfang.runner.dependency import TopologicalGraph
 from lanfang.runner.dependency import DynamicTopologicalGraph
 from lanfang.runner.multi_task_runner import MultiTaskRunner
 from lanfang.runner.task_register import TaskRegister
+from lanfang.runner.task_register import TaskSchema
 from lanfang.runner.task_loader import TaskLoader
 
 

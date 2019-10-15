@@ -346,9 +346,11 @@ class TaskRegister(object):
         cls, subset=subset, signature_map=signature_map)
 
     task_params, required_params, task_relations = helper.analysis()
+    task_params_str = json.dumps(task_params, indent=2, sort_keys=True)
 
     missing_params = required_params - set(feed_dict)
     if len(missing_params) > 0:
+      logging.info("Parameters analyzed %s", task_params_str)
       raise ValueError("Required parameter%s %s missing: %s" % (
           's' if len(missing_params) > 1 else '',
           "are" if len(missing_params) > 1 else "is",
@@ -357,6 +359,7 @@ class TaskRegister(object):
     global_key = runner.multi_task_runner.MultiTaskParams.__GLOBAL_KEY__
     extra_params = set(feed_dict) - set(task_params[global_key])
     if len(extra_params) > 0:
+      logging.info("Parameters analyzed %s", task_params_str)
       raise ValueError("Extra parameter%s %s received: %s, "
           "which is not allowed." % (
               's' if len(extra_params) > 1 else '',
@@ -505,7 +508,7 @@ class _TaskRegisterHelper(object):
           from_task = from_task_info.split(".")[0]
           if from_task not in task_relations[task['name']]:
             task_relations[task['name']].append(from_task)
-          task_params[task['name']]["input"][param_map_name] = from_task_info
+          task_params[task['name']]["input"][param_name] = from_task_info
 
         else:
           task_params[task['name']]["input"][param_name] = param_map_name
