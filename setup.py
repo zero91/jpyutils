@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
   name='lanfang',
-  version='0.1.5',
+  version='0.1.6-alpha',
   description='Make daily work and learning more efficient',
   author='Donald Cheung',
   author_email='jianzhang9102@gmail.com',
@@ -11,7 +11,8 @@ setup(
   python_requires='>=3.5',
   install_requires=[
     "requests>=2.20.0",
-    "voluptuous>=0.11.7"
+    "voluptuous>=0.11.7",
+    "tensorflow>=2.0"
   ],
   classifiers=[
     "Programming Language :: Python :: 3",

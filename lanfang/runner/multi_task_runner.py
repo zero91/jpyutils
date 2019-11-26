@@ -369,12 +369,10 @@ class MultiTaskRunner(object):
     task_name: str
       The name of the task need to add extra dependency.
 
-    depends: list
+    depends: string, list, tuple, set, dict
       List of depended tasks.
 
     """
-    if not isinstance(depends, list):
-      raise TypeError("Parameter 'depends' must be a list.")
     self._m_dependency.add(task_name, depends)
 
   def adds(self, tasks_str):
