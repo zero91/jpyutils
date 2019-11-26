@@ -44,7 +44,7 @@ class Mnist(Dataset):
 
   def artifacts(self):
     """Return artifacts of this dataset."""
-    return super(self.__class__, self).artifacts()
+    return {}
 
   def prepare(self):
     """This function will be called once to prepare the dataset."""
@@ -63,7 +63,7 @@ class Mnist(Dataset):
 
   def get_padding(self):
     """Padded shapes and padding values for batch data"""
-    return super(self.__class__, self).get_padding()
+    return None
 
   def read(self, split, mode):
     """Create an instance of the dataset object."""

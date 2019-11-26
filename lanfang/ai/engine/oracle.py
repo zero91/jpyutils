@@ -170,6 +170,7 @@ class KerasOracle(BaseOracle):
     if self._m_hparams.get("checkpoint") is not None:
       model_operator.load_weights(self._m_hparams["checkpoint"])
 
+    model_operator.summary()
     return model_operator
 
   def train(self, overwrite_params=False):
