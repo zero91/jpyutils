@@ -1,7 +1,8 @@
 from lanfang.ai.engine import names
 from lanfang.ai.engine.base.dataset import Dataset
-from lanfang.ai import dataset
 from lanfang.ai.engine.base.model import Model
+from lanfang.ai import dataset
+from lanfang.ai import model
 #from lanfang.ai.base.resource import Resource
 from lanfang.ai.engine.oracle import KerasOracle
 
