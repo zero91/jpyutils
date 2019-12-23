@@ -184,6 +184,49 @@ class SharedData(collections.MutableMapping):
     return int(hashlib.md5(frozen_value.encode("utf-8")).hexdigest(), 16)
 
 
+class RunnerHook(abc.ABC):
+  """The base hook class for runner to invoke during running.
+  """
+
+  @abc.abstractmethod
+  def begin(self, target, input_values):
+    pass
+
+  @abc.abstractmethod
+  def end(self, target, input_values, output_values):
+    pass
+
+
+class RunnerContext(object):
+  """Context for runner to record input/output parameters.
+  """
+
+  def __init__(self):
+    self._m_data = SharedData(shared_scope=SharedScope.PROCESS)
+
+  def get_input(self, name):
+    try:
+      return self._m_data[name]["input"]
+    except KeyError as ke:
+      return {}
+
+  def set_input(self, name, value):
+    params = self._m_data.get(name, {})
+    params.update({"input": value})
+    self._m_data.update({name: params})
+
+  def get_output(self, name):
+    try:
+      return self._m_data[name]["output"]
+    except KeyError as ke:
+      return {}
+
+  def set_output(self, name, value):
+    params = self._m_data.get(name, {})
+    params.update({"output": value})
+    self._m_data.update({name: params})
+
+
 class Runner(abc.ABC):
   """Base abstract class for running a target.
 
@@ -205,14 +248,12 @@ class Runner(abc.ABC):
     A boolean value indicating whether this runner
     is a daemon process/thread (True) or not (False).
 
-  pre_hooks: list of callable objects
-    A list of callable objects to be invoked before the target starts.
-    Each callable objects should have signature '(target, input_params)'.
+  hooks: list of RunnerHook objects
+    A list of RunnerHook objects.
 
-  post_hooks: list of callable objects
-    A list of callable objects to be invoked after the target execution.
-    The input parameters is the return value of the command.
-    Each callable objects should have signature '(output_values)'.
+  context: RunnerContext
+    The context manager to manage the input/output parameters to be shared
+    between multiple processes/threads.
 
   stdin: stream
     Input stream.
@@ -222,10 +263,6 @@ class Runner(abc.ABC):
 
   stderr: stream
     Error output stream.
-
-  shared_data: SharedData
-    The input/output parameters to be shared
-    between multiple processes/threads.
 
   internal_scope: SharedScope
     The internal data sharing scope of this runner.
@@ -249,12 +286,11 @@ class Runner(abc.ABC):
   stdout: stdout stream.
 
   stderr: stderr stream.
-
   """
+
   def __init__(self, target, *, name=None, retry=1, interval=5, daemon=None,
-                             pre_hooks=None, post_hooks=None,
+                             hooks=None, context=None,
                              stdin=None, stdout=None, stderr=None,
-                             shared_data=None,
                              internal_scope=SharedScope.THREAD):
     self._m_target = target
     self._m_name = name
@@ -262,19 +298,15 @@ class Runner(abc.ABC):
     self._m_retry_interval = interval
     self._m_daemon = daemon
 
-    if pre_hooks is not None and not isinstance(pre_hooks, (list, tuple)):
-      raise TypeError("Parameter 'pre_hooks' must be a list.")
-    self._m_pre_hooks = pre_hooks if pre_hooks is not None else []
+    if hooks is not None and not isinstance(hooks, (list, tuple)):
+      raise TypeError("Parameter 'hooks' must be a list.")
+    self._m_hooks = hooks if hooks is not None else []
 
-    if post_hooks is not None and not isinstance(post_hooks, (list, tuple)):
-      raise TypeError("Parameter 'post_hooks' must be a list.")
-    self._m_post_hooks = post_hooks if post_hooks is not None else []
+    self._m_context = context
 
     self.stdin = stdin
     self.stdout = stdout
     self.stderr = stderr
-
-    self._m_shared_data = shared_data
 
     status = {
       "attempts": 0,
@@ -335,11 +367,14 @@ class Runner(abc.ABC):
       raise RuntimeError("runner can only be started once")
     self._m_runner_status["start_time"] = time.time()
 
-    shared_input_params = self._fetch_shared_input_params()
-    input_params = self._fetch_input_params(shared_input_params)
+    if self._m_context is not None:
+      input_params = self._m_context.get_input(self.name)
+    else:
+      input_params = {}
+    input_params = self._fetch_input_params(input_params)
 
-    # Run pre hooks
-    self._execute_pre_hooks(input_params)
+    # Begin hooks
+    self._execute_hooks_begin(input_params)
 
     # Run target
     while not self.stopped() and \
@@ -359,42 +394,26 @@ class Runner(abc.ABC):
         self._m_runner_status["exitcode"] = exitcode
         exit(exitcode)
 
-    # Run post hooks
-    self._execute_post_hooks(output_values)
+    # End hooks
+    self._execute_hooks_end(input_params, output_values)
 
-    self._set_shared_output_params(output_values)
+    if self._m_context is not None:
+      self._m_context.set_output(self.name, output_values)
+
     self._m_runner_status["output"] = output_values
     self._m_runner_status["elapsed_time"] = \
         time.time() - self._m_runner_status["start_time"]
 
-  def _fetch_shared_input_params(self):
-    try:
-      if self._m_shared_data is not None:
-        return self._m_shared_data[self._m_name]["input"]
-      else:
-        return {}
-    except KeyError as ke:
-      return {}
-
   @abc.abstractmethod
-  def _fetch_input_params(self, shared_input_params):
-    """Extract all input parameters."""
+  def _fetch_input_params(self, params):
+    """Extract all input parameters from context params."""
     pass
 
-  def _set_shared_output_params(self, output_values):
-    if self._m_shared_data is None:
-      return
-    params = self._m_shared_data.get(self._m_name, {})
-    params.update({"output": output_values})
-    self._m_shared_data.update({self._m_name: params})
-
-  def _execute_pre_hooks(self, input_params):
-    for hook in self._m_pre_hooks:
-      if hook is None:
-        continue
-
+  def _execute_hooks_begin(self, input_params):
+    for hook in self._m_hooks:
+      input_values = copy.deepcopy(input_params)
       try:
-        ret = hook(self._m_target, copy.deepcopy(input_params))
+        ret = hook.begin(self._m_target, input_values)
       except BaseException as e:
         self._m_runner_status["elapsed_time"] = \
             time.time() - self._m_runner_status["start_time"]
@@ -403,18 +422,18 @@ class Runner(abc.ABC):
       if ret not in (0, None):
         self._m_runner_status["elapsed_time"] = \
             time.time() - self._m_runner_status["start_time"]
-        raise RuntimeError("Execute pre_hook '%s' failed with '%s', "
+        raise RuntimeError("Execute begin method of '%s' failed with '%s', "
             "please check the input parameters" % (hook, ret))
 
-  def _execute_post_hooks(self, output_values):
-    for hook in self._m_post_hooks:
-      if hook is None:
-        continue
-      ret = hook(copy.deepcopy(output_values))
+  def _execute_hooks_end(self, input_params, output_values):
+    for hook in self._m_hooks:
+      input_values = copy.deepcopy(input_params)
+      output_values = copy.deepcopy(output_values)
+      ret = hook.end(self._m_target, input_values, output_values)
       if ret not in (0, None):
         self._m_runner_status["elapsed_time"] = \
             time.time() - self._m_runner_status["start_time"]
-        raise RuntimeError("Execute post_hook '%s' failed with '%s', "
+        raise RuntimeError("Execute end method of hook '%s' failed with '%s', "
             "please check the output values" % (hook, ret))
 
   @abc.abstractmethod

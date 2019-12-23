@@ -1,8 +1,8 @@
-from lanfang.utils import deprecated
 import copy
 import collections
 import re
 import logging
+import abc
 
 
 class TopologicalGraph(object):
@@ -27,8 +27,8 @@ class TopologicalGraph(object):
     -------
     instance: TopologicalGraph
       Instance constructed from input argument.
-
     """
+
     instance = cls()
     for node_name, depends in nodes:
       instance.add(node_name, depends)
@@ -47,7 +47,7 @@ class TopologicalGraph(object):
 
     Returns
     -------
-    instance: TopologicalGraph
+    self: TopologicalGraph
       self instance.
 
     Raises
@@ -119,8 +119,8 @@ class TopologicalGraph(object):
     ------
     nodes: list
       Sorted nodes.
-
     """
+
     if order is True:
       self.is_valid(raises=True)
       key_func = lambda name: self._m_node_info[name]["order_id"]
@@ -139,8 +139,8 @@ class TopologicalGraph(object):
 
     recursive: bool
       Return all offspring if set True, otherwise return child nodes.
-
     """
+
     reverse_nodes = self._m_node_info[node]["reverse_depends"]
     if recursive is True:
       offspring = set()
@@ -149,26 +149,6 @@ class TopologicalGraph(object):
       reverse_nodes |= offspring
     return reverse_nodes
 
-  @deprecated("Unreasonable method, will be removed in future")
-  def get_task_info(self):
-    """Get information of all nodes.
-
-    Returns
-    -------
-    node_info: collections.defaultdict
-      {
-        "node_name": {
-          "initial_id": 0,
-          "order_id": 1,
-          "depends": set(),
-          "reverse_depends": set(),
-        },
-      }
-
-    """
-    self.is_valid(raises=True)
-    return copy.deepcopy(self._m_node_info)
-
   def is_valid(self, raises=False):
     """Evaluate the validation of this graph.
 
@@ -176,8 +156,8 @@ class TopologicalGraph(object):
     -------
     valid: boolean
       True if the nodes dependency realations is topological, otherwise False.
-
     """
+
     if self._m_is_valid is None:
       if self._m_node_initial_id != len(self._m_node_info):
         self._m_is_valid = False
@@ -186,7 +166,7 @@ class TopologicalGraph(object):
         node_info = copy.deepcopy(self._m_node_info)
         cur_node_id = 0
         while len(node_info) > 0:
-          ready_list = list()
+          ready_list = []
           for name in node_info:
             if len(node_info[name]["depends"]) == 0:
               ready_list.append(name)
@@ -194,8 +174,8 @@ class TopologicalGraph(object):
             self._m_is_valid = False
             break
 
-          for name in sorted(ready_list,
-                             key=lambda n: node_info[n]["initial_id"]):
+          for name in sorted(
+                  ready_list, key=lambda n: node_info[n]["initial_id"]):
             self._m_node_info[name]["order_id"] = cur_node_id
             cur_node_id += 1
             for depend_name in node_info[name]["reverse_depends"]:
@@ -280,7 +260,7 @@ class TopologicalGraph(object):
 
     Parameters
     ----------
-    nodes: string or list
+    nodes: string, list
       Nodes can be a pattern or in specific range syntax.
       Suppose we have a batch of nodes as [(0, 'a'), (1, 'b'), ..., (25, 'z')].
 
@@ -328,14 +308,29 @@ class TopologicalGraph(object):
     valid_nodes.sort(key=lambda t: self._m_node_info[t]["initial_id"])
 
     valid_nodes_set = set(valid_nodes)
-    valid_nodes_depends = list()
+    valid_nodes_depends = []
     for node in valid_nodes:
       depends = valid_nodes_set & self._m_node_info[node]["depends"]
       valid_nodes_depends.append(depends)
     return self.__class__.from_data(zip(valid_nodes, valid_nodes_depends))
 
 
-class DynamicTopologicalGraph(TopologicalGraph):
+class DynamicGraph(abc.ABC):
+  """Interface for managing dynamic graph.
+
+  Runner dependency relations manager should inherit this class.
+  """
+
+  @abc.abstractmethod
+  def remove(self, node):
+    pass
+
+  @abc.abstractmethod
+  def top(self, max_nodes_num=-1):
+    pass
+
+
+class DynamicTopologicalGraph(TopologicalGraph, DynamicGraph):
   def __init__(self):
     super(self.__class__, self).__init__()
 

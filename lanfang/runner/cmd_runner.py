@@ -52,14 +52,13 @@ class CmdRunner(Runner, threading.Thread):
   Child process can access configuration parameters through
   the environment variable 'TASK_RUNNER_PARAMETERS',
   which is a json string.
-
   """
+
   __doc__ += "\nDocument of Runner\n" + ("-" * 20) + "\n" + Runner.__doc__
 
   def __init__(self, target, *, name=None, retry=1, interval=5, daemon=None,
-                             pre_hooks=None, post_hooks=None,
+                             hooks=None, context=None,
                              stdin=None, stdout=None, stderr=None,
-                             shared_data=None,
                              encoding="utf-8", **popen_kwargs):
     if not isinstance(target, (str, list, tuple)):
       raise TypeError("Parameter 'target' should be a string or a list.")
@@ -68,9 +67,8 @@ class CmdRunner(Runner, threading.Thread):
 
     Runner.__init__(
       self, target=target, name=name, retry=retry, interval=interval,
-      daemon=daemon, pre_hooks=pre_hooks, post_hooks=post_hooks,
+      daemon=daemon, hooks=hooks, context=context,
       stdin=stdin, stdout=stdout, stderr=stderr,
-      shared_data=shared_data,
       internal_scope=SharedScope.THREAD)
 
     self._m_name = self.name
@@ -104,15 +102,9 @@ class CmdRunner(Runner, threading.Thread):
     # Setup Shared Parameters
     popen_kwargs["env"][__TASK_ENV_PARAMS__] = json.dumps(input_params)
 
-    #while not self._m_stop_flag.is_set()
     self._m_run_process = subprocess.Popen(self._m_target, **popen_kwargs)
     while self._m_run_process.stdout is None:
       time.sleep(0.1)
-
-    self.stdin = self._m_run_process.stdin
-    self.stdout = self._m_run_process.stdout
-    self.stderr = self._m_run_process.stderr
-    #self.stderr = stdout_stream
 
     stdout_lines = []
     while True:
@@ -129,6 +121,13 @@ class CmdRunner(Runner, threading.Thread):
 
     popen_kwargs["stdout"] = backup_stdout
     exitcode = self._m_run_process.poll()
+
+    for stream in [self._m_run_process.stdin,
+                   self._m_run_process.stdout,
+                   self._m_run_process.stderr]:
+      if stream is not None:
+        stream.close()
+
     if exitcode != 0:
       return exitcode, None
     else:
@@ -146,8 +145,8 @@ class CmdRunner(Runner, threading.Thread):
         pass
     return {}
 
-  def _fetch_input_params(self, shared_input_params):
-    return shared_input_params
+  def _fetch_input_params(self, params):
+    return params
 
   def is_alive(self):
     return threading.Thread.is_alive(self)

@@ -1,17 +1,8 @@
 import lanfang
-import sys
 import unittest
-import subprocess
-import os
 
 
 class TestTaskTopologicalGraph(unittest.TestCase):
-  def setUp(self):
-    pass
-
-  def tearDown(self):
-    pass
-
   def test_add_dependency(self):
     graph_1 = lanfang.runner.TopologicalGraph.from_data([
       ("run_task1", "task1,task2"),
@@ -39,8 +30,3 @@ class TestTaskTopologicalGraph(unittest.TestCase):
 
     nodes = graph.subset("1,2").get_nodes()
     self.assertEqual(len(nodes), 2)
-
-
-if __name__ == '__main__':
-  unittest.main()
-

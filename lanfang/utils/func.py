@@ -1,7 +1,7 @@
 import inspect
 
 
-def extract_kwargs(func, params, *, raises=False):
+def extract_kwargs(func, params, *, raises=False, return_missing=False):
   """Extract parameters of a function from input params.
 
   Parameters
@@ -14,6 +14,9 @@ def extract_kwargs(func, params, *, raises=False):
 
   raises: boolean
     Raise TypeError if the required parameters are not all specified.
+
+  return_missing: boolean
+    Return missing parameters is set True.
 
   Returns
   -------
@@ -43,4 +46,8 @@ def extract_kwargs(func, params, *, raises=False):
         func.__name__,
         "are" if len(missing_values) > 1 else "is",
         ", ".join(missing_values)))
-  return kwargs
+
+  if return_missing:
+    return kwargs, missing_values
+  else:
+    return kwargs
