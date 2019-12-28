@@ -1,5 +1,6 @@
 from lanfang import utils
 
+import os
 import abc
 import re
 import collections
@@ -15,6 +16,34 @@ class MultiTaskConfig(abc.ABC):
   """Configuration for multiple tasks.
   """
 
+  __ext_solver__ = {}
+
+  @staticmethod
+  def create(config_file, **params):
+    ext = os.path.splitext(config_file)[1]
+    if ext not in MultiTaskConfig.__ext_solver__:
+      raise KeyError("")
+    return MultiTaskConfig.__ext_solver__[ext](config_file, **params)
+
+  @staticmethod
+  def register(ext, config_class):
+    if ext in MultiTaskConfig.__ext_solver__:
+      raise KeyError("Extension '%s' is already registered" % (ext))
+    MultiTaskConfig.__ext_solver__[ext] = config_class
+
+  @abc.abstractstaticmethod
+  def exts():
+    """File extensions managed by this config.
+
+    Returns
+    -------
+    extension_list: iterable objects
+      An iterable objects.
+    """
+
+    raise NotImplementedError(
+        "You must implement abstract static method 'exts'.")
+
   @abc.abstractmethod
   def get_params(self):
     """Get all the parameters needed for this configuration.
@@ -24,6 +53,12 @@ class MultiTaskConfig(abc.ABC):
   @abc.abstractmethod
   def set_params(self, params: dict):
     """Set all the parameters needed for this configuration.
+    """
+    pass
+
+  @abc.abstractmethod
+  def get_param_values(self):
+    """Get all the parameter values.
     """
     pass
 
@@ -50,8 +85,9 @@ class MultiTaskJsonnetConfig(MultiTaskConfig):
   """Jsonnet format configuration for multiple tasks.
   """
 
-  def __init__(self, config_file):
+  def __init__(self, config_file, fake_values=None):
     self._m_template = re.compile(r"\<\%=(.*?)\%\>")
+    self._m_fake_values = fake_values
     self._m_config = None
     self._m_config_updated = True
     # Save all the update values
@@ -72,10 +108,19 @@ class MultiTaskJsonnetConfig(MultiTaskConfig):
     self._m_fetcher_key, self._m_fetcher_snippet = self._make_fetcher_snippet()
     self._m_lock = threading.Lock()
 
+  def exts():
+    return [".jsonnet", ".json"]
+
   def get_params(self):
     return set(self._m_required_params.values())
 
   def set_params(self, params):
+    if params is None:
+      params = {}
+    if not isinstance(params, dict):
+      raise TypeError("Parameter 'params' must be a dict, "
+          "but received %s(%s)" % (type(params), params))
+
     invalid_params = set(params) - self.get_params()
     if len(invalid_params) > 0:
       raise KeyError("Find unknown params: %s" % (",".join(invalid_params)))
@@ -88,8 +133,13 @@ class MultiTaskJsonnetConfig(MultiTaskConfig):
     if params != self._m_required_params_values:
       self._m_lock.acquire()
       self._m_config_updated = True
+      self._m_config = None
+      self._m_config_output_update_values.clear()
       self._m_required_params_values = copy.deepcopy(params)
       self._m_lock.release()
+
+  def get_param_values(self):
+    return copy.deepcopy(self._m_required_params)
 
   def update_params(self, params):
     invalid_params = set(params) - self.get_params()
@@ -97,8 +147,10 @@ class MultiTaskJsonnetConfig(MultiTaskConfig):
       raise KeyError("Find unknown params: %s" % (",".join(invalid_params)))
 
     self._m_lock.acquire()
-    self._m_required_params_values.update(params)
     self._m_config_updated = True
+    self._m_config = None
+    self._m_config_output_update_values.clear()
+    self._m_required_params_values.update(params)
     self._m_lock.release()
 
   def get_config(self):
@@ -186,7 +238,10 @@ class MultiTaskJsonnetConfig(MultiTaskConfig):
       return local_var
     candidate_text = self._m_template.sub(record_lookup, text)
 
-    fake_vars = "\n".join(["local %s = 0;" % v for v in candidate_arguments])
+    fake_vars = ""
+    for var, reg_match in candidate_arguments.items():
+      fake_vars += "local %s = %s;\n" % (
+          var, json.dumps(self._get_fake_values(reg_match.group(1).strip(), 0)))
     fake_text = jsonnet.evaluate_snippet("snippet", fake_vars + candidate_text)
 
     arguments = {}
@@ -202,6 +257,16 @@ class MultiTaskJsonnetConfig(MultiTaskConfig):
       jsonnet_text = jsonnet_text.replace(local_var, reg_match.group(1).strip())
 
     return arguments, candidate_text, jsonnet_text
+
+  def _get_fake_values(self, template_value, idx):
+    default_fake_values = (0, 1)
+    if self._m_fake_values is not None:
+      if isinstance(self._m_fake_values, tuple):
+        return self._m_fake_values[idx]
+      elif isinstance(self._m_fake_values, dict) and \
+              template_value in self._m_fake_values:
+        return self._m_fake_values[template_value][idx]
+    return default_fake_values[idx]
 
   def _make_fetcher_snippet(self):
     fetcher_key = utils.random.random_str(32)
@@ -223,8 +288,12 @@ class MultiTaskJsonnetConfig(MultiTaskConfig):
 
   def _check_config(self):
     # output of task shouldn't contains template.
-    setting_1 = "\n".join(["local %s = 123;" % v for v in self._m_all_params])
-    setting_2 = "\n".join(["local %s = 999;" % v for v in self._m_all_params])
+    setting_1, setting_2 = "", ""
+    for var, reg_match in self._m_all_params.items():
+      setting_1 += "local %s = %s;\n" % (var, json.dumps(
+          self._get_fake_values(reg_match.group(1).strip(), 0)))
+      setting_2 += "local %s = %s;\n" % (var, json.dumps(
+          self._get_fake_values(reg_match.group(1).strip(), 1)))
 
     config_1 = jsonnet.evaluate_snippet(
         "snippet", setting_1 + self._m_internal_text)

@@ -160,6 +160,52 @@ def get_path_create_time(path, time_format="%Y%m%d_%H%M%S"):
   return time.strftime(time_format, time.localtime(create_timestamp))
 
 
+def keep_files_with_pattern(path_dir, pattern, max_keep_num,
+                            key=None, reverse=False):
+  """Keep maximum number of files with pattern in a directory,
+  remove files if necessary.
+
+  Parameters
+  ----------
+  path_dir: str
+    The directory to operate.
+
+  pattern: str
+    The pattern of the files to operate.
+
+  max_keep_num: int
+    The maximum number of files to keep.
+
+  key: callable object
+    The key to sort the matched files in order.
+
+  reverse: bool
+    Reverse the sorted array is set True.
+
+  Returns
+  -------
+  remove_files: list
+    The files been removed.
+  """
+
+  if max_keep_num < 0:
+    return []
+
+  match_files = []
+  match_pattern = re.compile(pattern)
+  for fname in os.listdir(path_dir):
+    if not re.match(match_pattern, fname):
+      continue
+    match_files.append(fname)
+
+  match_files.sort(key=key, reverse=reverse)
+  remove_files = []
+  for match_file in match_files[max_keep_num: ]:
+    os.remove(os.path.join(path_dir, match_file))
+    remove_files.append(match_file)
+  return remove_files
+
+
 def read_zip(zipfname, filelist=None, encoding='utf-8'):
   """Read zip file.
 

@@ -151,6 +151,9 @@ class CmdRunner(Runner, threading.Thread):
   def is_alive(self):
     return threading.Thread.is_alive(self)
 
+  def join(self, timeout=None):
+    return threading.Thread.join(self, timeout=timeout)
+
   def stop(self):
     self._m_stop_event.set()
     if self._m_run_process is not None and self._m_run_process.poll() is None:

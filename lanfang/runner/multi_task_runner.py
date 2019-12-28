@@ -1,12 +1,14 @@
-from lanfang.runner.base import SharedData, SharedScope, RunnerStatus
+from lanfang.runner.base import RunnerStatus
 from lanfang.runner.cmd_runner import CmdRunner
-from lanfang.runner.func_process_runner import FuncProcessRunner
-from lanfang.runner.progress import TableDisplay
-from lanfang.runner.dependency import DynamicTopologicalGraph
+from lanfang.runner.func_runner import FuncProcessRunner
+from lanfang.runner.multi_task_progress_ui import MultiTaskTableProgressUI
+from lanfang.runner.multi_task_dependency import DynamicTopologicalGraph
+from lanfang.runner.multi_task_context import RecordRunnerContext
+from lanfang.runner.multi_task_context import DependentRunnerContext
+from lanfang.utils import disk
 
 import time
 import signal
-import re
 import os
 import sys
 import collections
@@ -14,154 +16,300 @@ import copy
 import json
 import logging
 import datetime
+import hashlib
+import threading
+import functools
 
 
-class MultiTaskParams(object):
-  """Shared parameters between multiple runners."""
+class MultiTaskManager(object):
+  pass
 
-  __GLOBAL_KEY__ = "__parameters__"
 
-  def __init__(self, params, global_params=None, global_key=__GLOBAL_KEY__):
-    """initializer.
+class Scheduler(object):
+  pass
+
+
+class ParallelScheduler(Scheduler):
+  pass
+
+
+class PipelineScheduler(Scheduler):
+  pass
+
+
+class PipelineRunner(object):
+  pass
+
+
+class TopologicalRunner(object):
+  pass
+
+
+class RunnerLogs(object):
+  pass
+
+
+class RunnerInventory(object):
+  """Record a batch of tasks.
+  """
+
+  def __init__(self, *, context=None,
+                        log_path=None,
+                        log_mode='w+',
+                        retry=1,
+                        interval=5):
+    self._m_context = context
+
+    self._m_log_path = log_path
+    if self._m_log_path is not None and not os.path.exists(self._m_log_path):
+      os.makedirs(self._m_log_path)
+    self._m_log_mode = log_mode
+    self._m_log_files = []
+
+    self._m_retry = retry
+    self._m_interval = interval
+
+    self._m_inventory = collections.OrderedDict()
+    self._m_runners = {}
+    self._m_lock = threading.Lock()
+    self._m_closed = False
+    self._m_restored_data = {}
+
+  def __enter__(self):
+    return self
+
+  def __exit__(self, err_type, err_val, err_tb):
+    self.close()
+
+  def list(self):
+    return list(self._m_inventory.keys())
+
+  def close(self, force=False, timeout=None):
+    self._m_lock.acquire()
+    try:
+      if self._m_closed is True:
+        raise RuntimeError("RunnerInventory has been closed already.")
+
+      for name in self._m_runners:
+        if not self._m_runners[name]["runner"].is_alive():
+          continue
+
+        if not force:
+          self._m_runners[name]["runner"].join(timeout=timeout)
+
+        if self._m_runners[name]["runner"].is_alive():
+          self._m_runners[name]["runner"].stop()
+          self._m_runners[name]["status"] = RunnerStatus.KILLED
+
+      for log_file in self._m_log_files:
+        log_file.close()
+        if os.path.getsize(log_file.name) == 0:
+          os.remove(log_file.name)
+      self._m_closed = True
+
+    finally:
+      self._m_lock.release()
+
+  def save(self, checkpoint_path, max_checkpoint_num=5):
+    self._m_lock.acquire()
+    timestamp = datetime.datetime.now().strftime("%Y%m%d.%H%M%S")
+    status = {}
+    for task_name in self._m_runners:
+      status[task_name] = self.get_info(task_name)
+      status[task_name]["status"] = status[task_name]["status"].name
+      status[task_name]["exitcode"] = \
+          self._m_runners[task_name]["runner"].exitcode
+    self._m_lock.release()
+
+    status_file = os.path.join(
+        checkpoint_path, "runner_status-{}.json".format(timestamp))
+    with open(status_file, 'w') as fout:
+      json.dump(status, fout, sort_keys=True, indent=2)
+
+    disk.keep_files_with_pattern(
+        path_dir=checkpoint_path,
+        pattern="runner_status-\d{8}.\d{6}.json",
+        max_keep_num=max_checkpoint_num,
+        reverse=True)
+    return status_file
+
+  def restore(self, checkpoint_path):
+    self._m_lock.acquire()
+    try:
+      with open(checkpoint_path, 'r') as fin:
+        for name, task_status in json.load(fin).items():
+          self._m_runners[name]["status"] = RunnerStatus[task_status["status"]]
+          self._m_restored_data[name] = task_status
+    except BaseException as e:
+      logging.warning("Restore from checkpoint '%s' got exception '%s'",
+          checkpoint_path, e)
+    finally:
+      self._m_lock.release()
+    return self
+
+  def new(self, context, log_path):
+    """Create a new RunnerInventory with all the added tasks.
 
     Parameters
     ----------
-    params: dict, filename
-      All parameters of all the tasks beging shared.
+    context: RunnerContext
+      A context shared with multiple tasks.
 
-    global_params: dict [optional]
-      The global parameters to share.
+    log_path: str
+      The file path of the logs.
 
-    global_key: str
-      The key name to access global parameters.
-
+    Returns
+    -------
+    runner_inventory: RunnerInventory
+      An RunnerInventory instance with
     """
-    self._m_global_key = global_key
 
-    if isinstance(params, dict):
-      self._m_params = copy.deepcopy(params)
-    elif isinstance(params, str):
-      with open(params, 'r') as fin:
-        self._m_params = json.load(fin)
-    else:
-      raise TypeError(
-        "Parameter 'params' must be a dict or a string for file name")
+    self._m_lock.acquire()
+    inventory = self.__class__(
+        context=context,
+        log_path=log_path,
+        log_mode=self._m_log_mode,
+        retry=self._m_retry,
+        interval=self._m_interval)
 
-    if self._m_global_key not in self._m_params:
-      self._m_params[self._m_global_key] = {}
+    for name, (target, runner_class, kwargs) in self._m_inventory.items():
+      inventory.add(name, target, runner_class=runner_class, **kwargs)
 
-    if global_params is not None:
-      if isinstance(global_params, dict):
-        self._m_params[self._m_global_key].update(global_params)
-      else:
-        raise TypeError("Parameter 'global_params' is not a dict")
+    self._m_lock.release()
+    return inventory
 
-    self._m_shared_params = SharedData(shared_scope=SharedScope.PROCESS)
-    self._m_shared_params_hash = None
-    self._render_params2share()
+  def add(self, name, target, runner_class=None, **kwargs):
+    """Add a new runner.
 
-  @property
-  def shared_params(self):
-    return self._m_shared_params
+    Parameters
+    ----------
+    name: str
+      The name of the task. Best using naming method of programming languages,
+      for it may be used for creating log files on disk.
 
-  @property
-  def params(self):
-    self.update()
-    return copy.deepcopy(self._m_params)
+    target: list, str, callable object
+      The target which needs to be executed.
 
-  def update(self):
-    if hash(self._m_shared_params) == self._m_shared_params_hash:
-      return
-    self._render_share2params()
-    self._render_params2share()
+    kwargs: dict
+      Other arguments of runner.
 
-  def dump(self, fname, *, debug=False):
-    fname = os.path.realpath(fname)
-    save_path = os.path.dirname(fname)
-    if not os.path.exists(save_path):
-      os.makedirs(save_path)
-
-    self.update()
-    if debug is True:
-      params = self._m_shared_params.copy()
-    else:
-      params = self._m_params
-
-    with open(fname, 'w') as fout:
-      json.dump(params, fout, sort_keys=True, indent=2)
-
-  def _render_params2share(self):
-    shared_params = {}
-
-    # Find all output values
-    output_dict = {}
-    for name, params in self._m_params.items():
-      if name == self._m_global_key:
-        continue
-      shared_params[name] = {"output": copy.deepcopy(params["output"])}
-      for item_name, item_value in params["output"].items():
-        output_dict[name + "." + item_name] = item_value
-
-    # Set input parameters according to the output values.
-    for name, params in self._m_params.items():
-      if name == self._m_global_key:
-        continue
-      shared_params[name]["input"] = {}
-      for item, item_scope in params["input"].items():
-        if not isinstance(item_scope, list):
-          shared_params[name]["input"][item] = \
-              self.__get_params_item(item_scope, output_dict)
-        else:
-          item_list = []
-          for scope in item_scope:
-            item_list.append(self.__get_params_item(scope, output_dict))
-          shared_params[name]["input"][item] = item_list
-
-    self._m_shared_params.clear()
-    self._m_shared_params.update(shared_params)
-    self._m_shared_params_hash = hash(self._m_shared_params)
-
-  def _render_share2params(self):
-    for name, params in self._m_params.items():
-      if name == self._m_global_key or name not in self._m_shared_params:
-        continue
-
-      if not isinstance(self._m_shared_params[name]["output"], dict):
-        logging.warning("Task '%s' did not return a dict, it returned [%s]",
-            name, self._m_shared_params[name]["output"])
-        continue
-
-      output_values = self._m_shared_params[name]["output"]
-      for item in params["output"]:
-        if item not in output_values:
-          logging.warning("Task '%s' did not output expected item [%s]",
-            name, item)
-          continue
-        self._m_params[name]["output"][item] = output_values[item]
-        output_values.pop(item)
-
-      if len(output_values) > 0:
-        logging.warning("Task '%s' output unexpected values [%s]",
-          name, json.dumps(output_values))
-
-  def __get_params_item(self, scope, output_dict=None):
+    Returns
+    -------
+    instance: RunnerInventory
+    """
+    self._m_lock.acquire()
     try:
-      scope = scope.strip()
-      if output_dict is not None and scope in output_dict:
-        return output_dict[scope]
+      if self._m_closed:
+        raise RuntimeError(
+            "Can't operate on a closed RunnerInventory instance.")
 
-      # Find parameter in global scope.
-      name_scope_list = scope.split('.')
-      if len(name_scope_list) == 0 or \
-            name_scope_list[0] != self._m_global_key:
-        name_scope_list.insert(0, self._m_global_key)
+      if not isinstance(name, str):
+        raise ValueError(
+            "'name' of runner must be a str, but received '%s'" % name)
 
-      params = self._m_params
-      for name_scope in name_scope_list:
-        params = params[name_scope]
-      return copy.deepcopy(params)
-    except Exception as e:
-      return copy.deepcopy(scope)
+      if name in self._m_runners:
+        raise KeyError("Runner '%s' is already exists." % name)
+
+      self._m_inventory[name] = (target, runner_class, kwargs)
+
+      if self._m_log_path is not None:
+        for sname, suffix in [("stdout", "out"), ("stderr", "err")]:
+          if sname in kwargs:
+            logging.info("'%s' already been set for runner '%s'", sname, name)
+            continue
+          log_fname = "%s/%s.%s" % (self._m_log_path, name, suffix)
+          kwargs[sname] = open(log_fname, self._m_log_mode)
+          self._m_log_files.append(kwargs[sname])
+
+      if "retry" not in kwargs:
+        kwargs["retry"] = self._m_retry
+      if "interval" not in kwargs:
+        kwargs["interval"] = self._m_interval
+
+      runner = self._get_runner_class(runner_class, target)(
+          target, name=name, context=self._m_context, **kwargs)
+      self._m_runners[runner.name] = {
+        "status": RunnerStatus.WAITING,
+        "runner": runner,
+      }
+    finally:
+      self._m_lock.release()
+    return self
+
+  def status(self, name):
+    return self._m_runners[name]["status"]
+
+  def update_status(self, name, status):
+    self._m_lock.acquire()
+    try:
+      if self._m_closed:
+        raise RuntimeError(
+            "Can't operate on a closed RunnerInventory instance.")
+      self._m_runners[name]["status"] = status
+    finally:
+      self._m_lock.release()
+
+  def start(self, name, recreate_if_necessary=False):
+    self._m_lock.acquire()
+    try:
+      if self._m_closed:
+        raise RuntimeError(
+            "Can't operate on a closed RunnerInventory instance.")
+      self._m_restored_data.pop(name, None)
+
+      if recreate_if_necessary and \
+              self._m_runners[name]["runner"].ident is not None:
+        if self._m_runners[name]["runner"].is_alive():
+          raise RuntimeError("Can't recreate a new runner "
+              "since previous runner is alive for '%s'" % (name))
+        else:
+          target, runner_class, kwargs = self._m_inventory[name]
+          runner_class = self._get_runner_class(runner_class, target)
+          self._m_runners[name]["runner"] = runner_class(
+              target, name=name, context=self._m_context, **kwargs)
+
+      self._m_runners[name]["status"] = RunnerStatus.RUNNING
+      self._m_runners[name]["runner"].start()
+    finally:
+      self._m_lock.release()
+
+  def is_alive(self, name):
+    if name in self._m_restored_data:
+      return False
+    return self._m_runners[name]["runner"].is_alive()
+
+  def exitcode(self, name):
+    if name in self._m_restored_data:
+      return self._m_restored_data[name]["exitcode"]
+    return self._m_runners[name]["runner"].exitcode
+
+  def get_info(self, name):
+    status = self._m_runners[name]["status"]
+    if name not in self._m_restored_data:
+      runner = self._m_runners[name]["runner"]
+      start_time = runner.start_time
+      elapsed_time = runner.elapsed_time
+      attempts = runner.attempts
+    else:
+      start_time = self._m_restored_data[name]["start_time"]
+      elapsed_time = self._m_restored_data[name]["elapsed_time"]
+      attempts = self._m_restored_data[name]["attempts"]
+
+    return {
+      "status": status,
+      "start_time": start_time,
+      "elapsed_time": elapsed_time,
+      "attempts": attempts
+    }
+
+  def _get_runner_class(self, runner_class, target):
+    if runner_class is not None:
+      return runner_class
+
+    if callable(target):
+      return FuncProcessRunner
+    else:
+      return CmdRunner
 
 
 class MultiTaskRunner(object):
@@ -191,232 +339,230 @@ class MultiTaskRunner(object):
   interval: float
     Interval time between each try.
 
-  params: str, dict
-    Configure for these tasks.
+  config_file: str
+    Configure file for these tasks.
 
-  global_params: dict
-    Global parameters for these bunch of tasks.
+  config_kwargs: dict
+    Parameters to initialize configuration instance.
 
-  render_arguments: dict
-    Dict which used to replace tasks parameter for its true value.
-    Used for add task from string.
-
-  params_max_checkpoint_num: int
+  max_checkpoint_num: int
     The maximum number of params checkpoints to save.
 
-  displayer: class
-    Class which can display tasks information.
-
+  runner_progresss_ui_class: MultiTaskProgressUI
+    Class to dynamically display tasks running status.
   """
-  def __init__(self, *, log_path=None, parallel_degree=-1, retry=1, interval=5,
-                     params=None, global_params=None, render_arguments=None,
-                     params_max_checkpoint_num=3, displayer=None):
-    if log_path is not None:
-      self._m_log_path = os.path.normpath(log_path)
-    else:
-      self._m_log_path = None
 
+  def __init__(self, *, log_path=None,
+                        parallel_degree=-1,
+                        retry=1,
+                        interval=5,
+                        config_file=None,
+                        config_kwargs={},
+                        params=None,
+                        runner_progresss_ui_class=MultiTaskTableProgressUI):
+    self._m_log_path = log_path
     self._m_parallel_degree = parallel_degree
-    self._m_retry = retry
-    self._m_interval = interval
+    self._m_config_file = config_file
+    self._m_config_kwargs = config_kwargs
+    self._m_params = params
+    self._m_runner_progress_ui_class = runner_progresss_ui_class
 
-    if render_arguments is None:
-      self._m_render_arguments = {}
-    elif isinstance(render_arguments, dict):
-      self._m_render_arguments = render_arguments
-    else:
-      raise ValueError("Parameter 'render_arguments' should be a dictionary")
-    self._m_render_arg_pattern = re.compile(r"\<\%=(.*?)\%\>")
+    self._m_pid = os.getpid()
+    self._m_lock = threading.Lock()
+    self._m_runner_code_snippet = []
+    self._m_runner_inventory = RunnerInventory(retry=retry, interval=interval)
+    self._m_cached_running_history = collections.OrderedDict()
+    self._m_runner_dependency = DynamicTopologicalGraph()
 
-    self._m_dependency = DynamicTopologicalGraph()
-    self._m_open_file_list = []
-    self._m_runner_dict = collections.defaultdict(dict)
-    self._m_running_tasks = set()
-    self._m_started = False
+  def __enter__(self):
+    return self
 
-    if params is not None:
-      self._m_params = MultiTaskParams(params, global_params)
-    else:
-      self._m_params = None
+  def __exit__(self, err_type, err_val, err_tb):
+    self.close()
 
-    self._m_params_max_checkpoint_num = params_max_checkpoint_num
-    if self._m_params_max_checkpoint_num <= 0:
-      raise ValueError(
-          "Parameter 'params_max_checkpoint_num' must be a postive integer")
+  def set_params(self, params):
+    self._m_params = params
 
-    if displayer is None:
-      self._m_displayer_class = TableDisplay
-    else:
-      self._m_displayer_class = displayer
+  def get_params(self):
+    return copy.deepcopy(self._m_params)
 
-  @property
-  def run_params(self):
-    if self._m_params is None:
-      return None
-    return self._m_params.params
+  def close(self, force=False, timeout=None):
+    """Close all key resources.
+    """
+    self._m_runner_inventory.close()
+    for key, record in self._m_cached_running_history.items():
+      record["runner_inventory"].close(force=force, timeout=timeout)
+    self._m_cached_running_history.clear()
 
-  def __del__(self):
-    try:
-      for f in self._m_open_file_list:
-        f.close()
-    except:
-      return
-
-  def add(self, target, *, name=None, args=(), kwargs={},
-                        pre_hooks=None, post_hooks=None,
-                        depends=None, encoding="utf-8", daemon=None,
-                        append_log=False, **popen_kwargs):
-    """Add a new task.
+  def save(self, checkpoint_path, *, params=None, max_checkpoint_num=5):
+    """Save the status into disk.
 
     Parameters
     ----------
-    target: list, str, callable object
-      The target which needs to be executed.
+    checkpoint_path: str
+      The directory to save checkpoint files.
 
+    params: dict
+      The parameters of the running session.
+
+    max_checkpoint_num: int
+      Maximum number of checkpoints.
+
+    Returns
+    -------
+    checkpoint_info: dict
+      The information of the checkpoint.
+    """
+
+    if checkpoint_path is None:
+      return
+
+    if not os.path.exists(checkpoint_path):
+      os.makedirs(checkpoint_path)
+
+    if not os.path.isdir(checkpoint_path):
+      raise IOError("Target checkpoint path '%s' is not a directory." % (
+          checkpoint_path))
+
+    if params is None:
+      params = self._m_params
+    record = self._get_cached_history(params)
+
+    runner_inventory_file = record["runner_inventory"].save(
+            checkpoint_path, max_checkpoint_num=max_checkpoint_num)
+
+    context_file = record["context"].save(
+            checkpoint_path, max_checkpoint_num=max_checkpoint_num)
+
+    all_checkpoints_file = os.path.join(checkpoint_path, "all_checkpoints.json")
+    checkpoints_record = {}
+    if os.path.isfile(all_checkpoints_file):
+      with open(all_checkpoints_file, 'r') as fin:
+        try:
+          checkpoints_record = json.load(fin)
+        except:
+          pass
+
+    checkpoints_record.pop("checkpoint", None)
+    timestamp = datetime.datetime.now().strftime("%Y%m%d.%H%M%S")
+    checkpoints_record[timestamp] = {
+      "runner_inventory": runner_inventory_file,
+      "context": context_file,
+      "params": params
+    }
+
+    if max_checkpoint_num <= 0:
+      max_checkpoint_num = len(checkpoints_record)
+
+    remove_keys = sorted(checkpoints_record, reverse=True)[max_checkpoint_num:]
+    for checkpoint_index in remove_keys:
+      checkpoints_record.pop(checkpoint_index)
+    checkpoints_record["checkpoint"] = timestamp
+
+    with open(all_checkpoints_file, 'w') as fout:
+      json.dump(checkpoints_record, fout, indent=2, sort_keys=True)
+
+    return checkpoints_record[timestamp]
+
+  def restore(self, checkpoint_path):
+    if os.path.isfile(checkpoint_path):
+      all_checkpoints_file = checkpoint_path
+    else:
+      all_checkpoints_file = os.path.join(
+          checkpoint_path, "all_checkpoints.json")
+
+    with open(all_checkpoints_file, 'r') as fin:
+      checkpoints_record = json.load(fin)
+      restore_info = checkpoints_record[checkpoints_record["checkpoint"]]
+
+      self.set_params(restore_info["params"])
+      cached_record = self._get_cached_history(restore_info["params"])
+
+      cached_record["context"].restore(restore_info["context"])
+      cached_record["runner_inventory"].restore(
+          restore_info["runner_inventory"])
+
+    return self
+
+  def add(self, name, target, *, depends=None, **kwargs):
+    """Add a new runner.
+
+    Parameters
+    ----------
     name: str
       The name of the task. Best using naming method of programming languages,
       for it may be used for creating log files on disk.
 
-    args: tuple
-      The argument tuple for the target invocation. Defaults to ().
-
-    kwargs: dict
-      The dictionary of keyword arguments for the target invocation.
-      Defaults to {}.
-
-    pre_hooks: list of callable objects
-      A list of callable objects to be invoked before 'target' execution.
-      The input parameters is the same as 'target'.
-
-    post_hooks: list of callable objects
-      A list of callable objects to be invoked after 'target' execution.
-      The input parameters is the return value of calling 'target'.
+    target: list, str, callable object
+      The target which needs to be executed.
 
     depends: str, list, set, dict
-      List of depended tasks.
-      If this is a string, multiple tasks can be separated by a single comma.
-
-    encoding: str
-      The encoding of the data output by target's stdout.
-
-    daemon: boolean
-      A boolean value indicating whether this runner
-      is a daemon process (True) or not (False).
-
-    append_log: boolean
-      Append logs to log file if set True, otherwise clear old content.
-
-    popen_kwargs: dict
-      It has the same meaning as arguments of Popen.
+      List of depended runners.
+      If this is a string, multiple runners can be separated by a single comma.
 
     Returns
     -------
-    instance: MultiTaskRunner
+    self: MultiTaskRunner
       Reference for current instance.
-
-    Raises
-    ------
-    KeyError: If the task is already exists.
-
     """
-    if name in self._m_runner_dict:
-      raise KeyError("Task {0} is already exists!".format(name))
 
-    if self._m_log_path is not None:
-      logs_path = os.path.join(self._m_log_path, "logs")
-      if not os.path.exists(logs_path):
-        os.makedirs(logs_path)
-
-      for sname, suffix in [("stdout", "out"), ("stderr", "err")]:
-        if sname in popen_kwargs:
-          logging.warning("Parameter '%s' already exists for task '%s'",
-              sname, name)
-          continue
-        open_tag = 'a+' if append_log is True else 'w+'
-        log_fname = "%s/%s.%s" % (logs_path, name, suffix)
-        popen_kwargs[sname] = open(log_fname, open_tag)
-        self._m_open_file_list.append(popen_kwargs[sname])
-
-    shared_params = None
-    if self._m_params is not None:
-      shared_params = self._m_params.shared_params
-
-    if callable(target):
-      runner = FuncProcessRunner(
-        target, name=name, args=args, kwargs=kwargs,
-        retry=self._m_retry, interval=self._m_interval, daemon=daemon,
-        pre_hooks=pre_hooks, post_hooks=post_hooks,
-        shared_data=shared_params, **popen_kwargs)
-    else:
-      runner = CmdRunner(
-        target, name=name,
-        retry=self._m_retry, interval=self._m_interval, daemon=daemon,
-        pre_hooks=pre_hooks, post_hooks=post_hooks,
-        shared_data=shared_params, encoding=encoding, **popen_kwargs)
-
-    self._m_runner_dict[runner.name] = {
-      "status": RunnerStatus.WAITING,
-      "runner": runner,
-    }
-    self._m_dependency.add(runner.name, depends)
+    self._m_runner_inventory.add(name, target, **kwargs)
+    self._m_runner_dependency.add(name, depends)
+    for key, record in self._m_cached_running_history.items():
+      record["runner_inventory"].add(name, target, **kwargs)
     return self
 
-  def add_extra_dependency(self, task_name, depends):
-    """Add extra dependency relations.
+  def adds(self, runner_str):
+    """Add runner from string.
 
     Parameters
     ----------
-    task_name: str
-      The name of the task need to add extra dependency.
-
-    depends: string, list, tuple, set, dict
-      List of depended tasks.
-
-    """
-    self._m_dependency.add(task_name, depends)
-
-  def adds(self, tasks_str):
-    """Add tasks from a string.
-
-    Parameters
-    ----------
-    tasks_str: str
-      The string of the tasks, which is a python executable code.
+    runner_str: str
+      The string of the runner, which is a python executable code.
 
     Returns
     -------
-    instance: MultiTaskRunner
+    self: RunnerInventory
       Reference for current instance.
-
-    Raises
-    ------
-    KeyError: Some of the arguments specified in 'tasks_str' did not provided.
-
     """
-    exec(self._render_arguments(tasks_str), {}, {'Runner': self.add})
+
+    exec(runner_str, {}, {'Runner': self.add})
     return self
 
-  def addf(self, tasks_fname, encoding="utf-8"):
+  def addf(self, runner_fname, encoding="utf-8"):
     """Add tasks from a file.
 
     Parameters
     ----------
-    tasks_fname: str
-      The file's name of which contains tasks.
+    runner_fname: str
+      The file which contains the runner code snippet.
 
     encoding: str
-      The encode of file content specified by `tasks_fname'.
+      The encode of file content specified by `runner_fname'.
 
     Returns
     -------
-    instance: MultiTaskRunner
+    self: RunnerInventory
       Reference for current instance.
-
     """
-    with open(tasks_fname, mode='r', encoding=encoding) as ftask:
-      return self.adds(self._render_arguments(ftask.read()))
 
-  def lists(self, *, verbose=False):
+    with open(runner_fname, mode='r', encoding=encoding) as fin:
+      return self.adds(fin.read())
+
+  def add_dependency(self, task_name, depends):
+    """Add dependent relations for a task.
+
+    Parameters
+    ----------
+    task_name: str
+      The name of the task need to add dependency.
+
+    depends: string, list, tuple, set, dict
+      List of depended tasks.
+    """
+    self._m_dependency.add(task_name, depends)
+
+  def list(self, *, params=None, verbose=False):
     """List all tasks.
 
     Parameters
@@ -432,17 +578,26 @@ class MultiTaskRunner(object):
     Raises
     ------
     ValueError: If the tasks relations is not topological.
-
     """
-    if not self._m_dependency.is_valid():
+
+    if not self._m_runner_dependency.is_valid():
       raise ValueError("The dependency relations of tasks is not topological")
 
     if verbose is True:
-      self._m_displayer_class(
-        self._m_dependency, self._m_runner_dict).write()
-    return self._m_dependency.get_nodes(order=True)
+      if params is None:
+        params = self._m_params
 
-  def run(self, tasks=None, verbose=False, try_best=False):
+      if params is not None:
+        runner_inventory = self._get_cached_history(params)["runner_inventory"]
+      else:
+        runner_inventory = self._m_runner_inventory
+
+      progress_ui = self._m_runner_progress_ui_class(
+          runner_inventory, self._m_runner_dependency)
+      progress_ui.display(reuse=False)
+    return self._m_runner_dependency.get_nodes(order=True)
+
+  def run(self, tasks=None, *, params=None, verbose=False, try_best=False):
     """Run a bunch of tasks.
 
     Parameters
@@ -450,6 +605,9 @@ class MultiTaskRunner(object):
     tasks: str
       The tasks which needed to be executed,
       see more details of 'DependencyManager.subset'.
+
+    params: dict
+      The parameters needed to run the tasks.
 
     verbose: boolean
       Print verbose information.
@@ -461,159 +619,148 @@ class MultiTaskRunner(object):
     Returns
     -------
     result : integer
-      0 for success, otherwise nonzero.
+      Number of failed tasks.
 
     Raises
     ------
     RuntimeError:
       If the set of tasks is not topological or has been exected already.
-
-    Notes
-    -----
-    Should only be executed only once.
-
     """
-    if self._m_started:
-      raise RuntimeError("cannot run %s twice" % (self.__class__.__name__))
 
-    if not self._m_dependency.is_valid():
-      raise RuntimeError("Dependency relations of tasks is not topological")
+    if not self._m_runner_dependency.is_valid():
+      raise RuntimeError("Dependent relations of tasks is not topological")
 
-    self._m_started = True
-    signal.signal(signal.SIGINT, self.__kill_signal_handler)
-    signal.signal(signal.SIGTERM, self.__kill_signal_handler)
+    self._m_lock.acquire()
+    try:
+      handler = functools.partial(self._kill_signal_handler, run_params=params)
+      prev_sigint_handler = signal.signal(signal.SIGINT, handler)
+      prev_sigterm_handler = signal.signal(signal.SIGTERM, handler)
+      return self._run_multiple_tasks(
+          tasks=tasks, params=params, verbose=verbose, try_best=try_best)
+    finally:
+      signal.signal(signal.SIGINT, prev_sigint_handler)
+      signal.signal(signal.SIGTERM, prev_sigterm_handler)
+      self._m_lock.release()
 
-    run_dependency = self._m_dependency.subset(tasks)
-    run_nodes = set(run_dependency.get_nodes())
-    for task_name in self._m_runner_dict:
-      if task_name not in run_nodes:
-        self._m_runner_dict[task_name]["status"] = RunnerStatus.DISABLED
+  def _run_multiple_tasks(self, tasks=None, *,
+                                params=None,
+                                verbose=False,
+                                try_best=False):
+    if params is None:
+      params = self._m_params
+    history_info = self._get_cached_history(params)
+    runner_inventory = history_info["runner_inventory"]
+    context = history_info["context"]
 
+    dependency = self._m_runner_dependency.subset(tasks)
+    enabled_tasks = set(dependency.get_nodes())
     if verbose:
-      disp = self._m_displayer_class(self._m_dependency, self._m_runner_dict)
-      disp.write()
+      progress_ui = self._m_runner_progress_ui_class(
+          runner_inventory, dependency)
+      progress_ui.display()
     else:
-      disp = None
+      progress_ui = None
 
+    previous_input = {}
+    for task_name in enabled_tasks:
+      previous_input[task_name] = context.get_input(task_name)
+
+    remaining_tasks = set(enabled_tasks)
+    running_tasks = set()
     succeed_tasks = set()
     failed_tasks = set()
     while True:
-      for task_name in run_dependency.top():
-        if self._m_runner_dict[task_name]["status"] not in [
-            RunnerStatus.READY, RunnerStatus.WAITING]:
+      for task_name in dependency.top():
+        if task_name not in remaining_tasks:
           continue
-        if self._m_parallel_degree < 0 \
-            or len(self._m_running_tasks) < self._m_parallel_degree:
-          self._m_running_tasks.add(task_name)
-          self._m_runner_dict[task_name]["status"] = RunnerStatus.RUNNING
-          self._m_runner_dict[task_name]["runner"].start()
+
+        # task succeed already.
+        if runner_inventory.status(task_name) == RunnerStatus.DONE \
+              and context.get_input(task_name) == previous_input[task_name]:
+          remaining_tasks.remove(task_name)
+          running_tasks.add(task_name)
+          continue
+
+        if self._m_parallel_degree < 0 or len(
+                running_tasks) < self._m_parallel_degree:
+          remaining_tasks.remove(task_name)
+          running_tasks.add(task_name)
+          runner_inventory.start(task_name, recreate_if_necessary=True)
         else:
-          self._m_runner_dict[task_name]["status"] = RunnerStatus.READY
+          runner_inventory.update_status(task_name, RunnerStatus.READY)
 
-      for task_name in self._m_running_tasks.copy():
-        if self._m_runner_dict[task_name]["runner"].is_alive():
+      for task_name in running_tasks.copy():
+        if runner_inventory.is_alive(task_name):
           continue
-        self._m_running_tasks.remove(task_name)
+        running_tasks.remove(task_name)
 
-        exitcode = self._m_runner_dict[task_name]["runner"].exitcode
-        if exitcode != 0:
-          self._m_runner_dict[task_name]["status"] = RunnerStatus.FAILED
-          logging.critical("Task %s failed, exit with code '%s'",
-              task_name, exitcode)
-
+        exitcode = runner_inventory.exitcode(task_name)
+        if exitcode != 0 and exitcode is not None:
+          runner_inventory.update_status(task_name, RunnerStatus.FAILED)
+          logging.critical(
+              "Task %s failed, exit with code '%s'", task_name, exitcode)
           failed_tasks.add(task_name)
-          offspring = run_dependency.reverse_depends(task_name, recursive=True)
+          offspring = dependency.reverse_depends(task_name, recursive=True)
           failed_tasks |= offspring
           for name in offspring:
-            self._m_runner_dict[name]["status"] = RunnerStatus.CANCELED
+            runner_inventory.update_status(name, RunnerStatus.CANCELED)
         else:
-          self._m_runner_dict[task_name]["status"] = RunnerStatus.DONE
-          if self._m_params is not None:
-            self._m_params.update()
+          runner_inventory.update_status(task_name, RunnerStatus.DONE)
           succeed_tasks.add(task_name)
-          run_dependency.remove(task_name)
+          dependency.remove(task_name)
 
-      verbose and disp.write()
-      if len(succeed_tasks) + len(failed_tasks) == len(run_nodes):
+      verbose and progress_ui.display()
+      if len(succeed_tasks) + len(failed_tasks) == len(enabled_tasks):
         break
       if not try_best and len(failed_tasks) > 0:
         self.stop()
         break
       time.sleep(0.1)
 
-    self._dump_run_params()
-    verbose and disp.write(refresh=True)
-    if len(failed_tasks) > 0:
-      return 1
-    else:
-      return 0
+    if verbose:
+      progress_ui.display(reuse=False)
+      progress_ui.clear()
+    return len(failed_tasks)
 
-  def __kill_signal_handler(self, signum, stack):
+  def _get_cached_history(self, params):
+    params_str = json.dumps(params, sort_keys=True).encode("utf-8")
+    params_hashkey = hashlib.md5(params_str).hexdigest()
+    if params_hashkey in self._m_cached_running_history:
+      return self._m_cached_running_history[params_hashkey]
+
+    if self._m_config_file is not None:
+      context = DependentRunnerContext(
+          task_config_file=self._m_config_file, **self._m_config_kwargs)
+    else:
+      context = RecordRunnerContext()
+    context.set_params(params)
+
+    if len(self._m_cached_running_history) == 0:
+      log_path = self._m_log_path
+    else:
+      log_path = os.path.join(self._m_log_path, params_hashkey)
+
+    self._m_cached_running_history[params_hashkey] = {
+      "params": copy.deepcopy(params),
+      "runner_inventory": self._m_runner_inventory.new(
+          context=context, log_path=log_path),
+      "context": context
+    }
+    return self._m_cached_running_history[params_hashkey]
+
+  def _kill_signal_handler(self, signum, stack, run_params=None):
+    # Every subproces will receive the same signal,
+    # we process the signal in the same process with MultiTaskRunner.
+    if os.getpid() != self._m_pid:
+      return
+    logging.warning("Receive signal %s, try to kill all running runners.",
+        signal.Signals(signum).name)
     self.stop()
-    self._m_displayer_class(self._m_dependency, self._m_runner_dict).write()
-    logging.warning("Receive signal %s, all runners are killed.", signum)
+    self.list(params=run_params, verbose=True)
+    logging.warning("All runners are killed.")
     sys.exit(1)
 
   def stop(self):
     """Stop all runners."""
-    for task_name in self._m_running_tasks.copy():
-      try:
-        self._m_runner_dict[task_name]["runner"].stop()
-        self._m_runner_dict[task_name]["status"] = RunnerStatus.KILLED
-      finally:
-        self._m_running_tasks.remove(task_name)
-    self._dump_run_params()
-
-  def get_runner(self, task_name):
-    """Get running instance of 'task_name'.
-
-    Parameters
-    ----------
-    task_name: str
-      Target task's name.
-
-    Returns
-    -------
-    runner: CmdRunner, FuncProcessRunner
-      Reference runner of 'task_name'.
-
-    """
-    if task_name not in self._m_runner_dict:
-      return None
-    return self._m_runner_dict[task_name]["runner"]
-
-  def _render_arguments(self, param):
-    if isinstance(param, list):
-      return list(map(self._render_arguments, param))
-
-    if not isinstance(param, str):
-      return param
-
-    for match_str in re.findall(self._m_render_arg_pattern, param):
-      match_str = match_str.strip()
-      if match_str not in self._m_render_arguments:
-        raise KeyError(
-          "missing value for render argument '{0}'".format(match_str))
-
-    def __lookup_func(reg_match):
-      return self._m_render_arguments[reg_match.group(1).strip()]
-    return self._m_render_arg_pattern.sub(__lookup_func, param)
-
-  def _dump_run_params(self):
-    if self._m_params is None or self._m_log_path is None:
-      return
-
-    save_path = os.path.join(self._m_log_path, "run_params")
-    if os.path.exists(save_path):
-      params_fname_pattern = re.compile("\d{8}_\d{6}")
-      checkpoints = []
-      for fname in os.listdir(save_path):
-        if params_fname_pattern.match(fname):
-          checkpoints.append(fname)
-      checkpoints.sort(reverse=True)
-      for fname in checkpoints[self._m_params_max_checkpoint_num - 1 : ]:
-        os.remove(os.path.join(save_path, fname))
-
-    time_stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    save_fname = os.path.join(save_path, "%s.json" % (time_stamp))
-    self._m_params.dump(save_fname)
+    for task_name, record in self._m_cached_running_history.items():
+      record["runner_inventory"].close(force=True)

@@ -197,34 +197,86 @@ class RunnerHook(abc.ABC):
     pass
 
 
-class RunnerContext(object):
-  """Context for runner to record input/output parameters.
+class RunnerContext(abc.ABC):
+  """Context for runner to share data.
   """
+  @abc.abstractmethod
+  def get_params(self):
+    """Get all parameters.
+    """
+    pass
 
-  def __init__(self):
-    self._m_data = SharedData(shared_scope=SharedScope.PROCESS)
+  @abc.abstractmethod
+  def set_params(self, params):
+    """Set new values of parameters.
 
+    Parameters
+    ----------
+    params: dict
+      The value of each parameter.
+    """
+    pass
+
+  @abc.abstractmethod
   def get_input(self, name):
-    try:
-      return self._m_data[name]["input"]
-    except KeyError as ke:
-      return {}
+    """Get input of a task.
 
+    Parameter
+    ---------
+    name: str
+      Name of the task.
+    """
+
+  @abc.abstractmethod
   def set_input(self, name, value):
-    params = self._m_data.get(name, {})
-    params.update({"input": value})
-    self._m_data.update({name: params})
+    """Set input of a task.
 
+    Parameter
+    ---------
+    name: str
+      Name of the task.
+
+    value: dict
+      Input value of the task.
+    """
+    pass
+
+  @abc.abstractmethod
   def get_output(self, name):
-    try:
-      return self._m_data[name]["output"]
-    except KeyError as ke:
-      return {}
+    """Get output of a task.
 
+    Parameter
+    ---------
+    name: str
+      Name of the task.
+    """
+    pass
+
+  @abc.abstractmethod
   def set_output(self, name, value):
-    params = self._m_data.get(name, {})
-    params.update({"output": value})
-    self._m_data.update({name: params})
+    """Set output of a task.
+
+    Parameter
+    ---------
+    name: str
+      Name of the task.
+
+    value: dict
+      Output value of the task.
+    """
+    pass
+
+  @abc.abstractmethod
+  def save(self, checkpoint_path):
+    """Save the context into a path in disk.
+    """
+    pass
+
+  @abc.abstractmethod
+  def restore(self, checkpoint_path):
+    """Restore the context from a path in disk.
+    """
+    pass
 
 
 class Runner(abc.ABC):
@@ -349,6 +401,11 @@ class Runner(abc.ABC):
     pass
 
   @abc.abstractmethod
+  def join(self, timeout=None):
+    """Wait until this runner terminates."""
+    pass
+
+  @abc.abstractmethod
   def _execute_target(self, input_params):
     """Execute the target.
 
@@ -398,7 +455,11 @@ class Runner(abc.ABC):
     self._execute_hooks_end(input_params, output_values)
 
     if self._m_context is not None:
-      self._m_context.set_output(self.name, output_values)
+      try:
+        self._m_context.set_output(self.name, output_values)
+      except BaseException as e:
+        self._m_runner_status["exitcode"] = 1
+        raise e
 
     self._m_runner_status["output"] = output_values
     self._m_runner_status["elapsed_time"] = \

@@ -51,3 +51,27 @@ def extract_kwargs(func, params, *, raises=False, return_missing=False):
     return kwargs, missing_values
   else:
     return kwargs
+
+
+def subclasses(root_class, recursive=True):
+  """Get all subclasses of a class.
+
+  Parameters
+  ----------
+  root_class: class
+    A python class.
+
+  recursive: bool
+    Set True to get all offspring classes, otherwise get all son classes.
+
+  Returns
+  -------
+  all_subclasses: set
+    All subclasses.
+  """
+
+  all_subclasses = set()
+  for sub_class in root_class.__subclasses__():
+    all_subclasses.add(sub_class)
+    all_subclasses |= subclasses(sub_class)
+  return all_subclasses

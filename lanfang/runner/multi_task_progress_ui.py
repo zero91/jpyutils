@@ -9,7 +9,11 @@ import abc
 class MultiTaskProgressUI(abc.ABC):
 
   @abc.abstractmethod
-  def display(self):
+  def display(self, reuse=True):
+    pass
+
+  @abc.abstractmethod
+  def clear(self):
     pass
 
 
@@ -18,22 +22,25 @@ class MultiTaskTableProgressUI(MultiTaskProgressUI):
   """
 
   color = {
-    RunnerStatus.DISABLED : "\033[30;1mDisabled\033[0m",
-    RunnerStatus.WAITING  : "\033[36;1mWaiting \033[0m",
-    RunnerStatus.READY    : "\033[34;1mReady   \033[0m",
-    RunnerStatus.RUNNING  : "\033[33;1mRunning \033[0m",
-    RunnerStatus.DONE     : "\033[32;1mDone    \033[0m",
-    RunnerStatus.FAILED   : "\033[31;1mFailed  \033[0m",
-    RunnerStatus.KILLED   : "\033[35;1mKilled  \033[0m",
-    RunnerStatus.CANCELED : "\033[31;1mCanceled\033[0m",
+    RunnerStatus.DISABLED : "\033[%s30;1mDisabled\033[0m",
+    RunnerStatus.WAITING  : "\033[%s36;1mWaiting\033[0m ",
+    RunnerStatus.READY    : "\033[%s34;1mReady\033[0m   ",
+    RunnerStatus.RUNNING  : "\033[%s33;1mRunning\033[0m ",
+    RunnerStatus.DONE     : "\033[%s32;1mDone\033[0m    ",
+    RunnerStatus.FAILED   : "\033[%s31;1mFailed\033[0m  ",
+    RunnerStatus.KILLED   : "\033[%s35;1mKilled\033[0m  ",
+    RunnerStatus.CANCELED : "\033[%s38;5;162;1mCanceled\033[0m"
   }
 
   def __init__(self, runner_inventory, runner_dependency,
-                                       update_interval=0.3,
+                                       update_interval=0.1,
                                        output_stream=sys.stderr):
     self._m_runner_inventory = runner_inventory
     self._m_runner_dependency = runner_dependency
-    self._m_task_names = self._m_runner_dependency.get_nodes()
+    self._m_task_names = self._m_runner_inventory.list()
+    self._m_unrelated_tasks = set(self._m_task_names) - set(
+        self._m_runner_dependency.get_nodes())
+
     self._m_update_interval = update_interval
     self._m_output_stream = output_stream
     self._m_dynamic_display = (hasattr(output_stream, 'isatty') and
@@ -41,24 +48,24 @@ class MultiTaskTableProgressUI(MultiTaskProgressUI):
 
     self._m_column_length = {
       'id': len(str(len(self._m_task_names) - 1)),
-      'task_name': min(32, max(map(len, self._m_task_names))),
+      'task_name': min(32, max(map(len, self._m_task_names + [""]))),
       'start_time': 14, # format: mm.dd HH:MM:SS
       'elapsed_time': 8,
       'attempts': 3
     }
-    self._m_row_separator = '-' * (sum(self._m_column_length.values()) + 40)
+    self._m_row_separator = '-' * (sum(self._m_column_length.values()) + 26)
     self._m_last_update = 0
 
-  def display(self):
+  def display(self, reuse=True):
     if not self._m_dynamic_display:
       return
 
-    if time.time() - self._m_last_update < self._m_update_interval:
+    if reuse is True and \
+            time.time() - self._m_last_update < self._m_update_interval:
       return
 
     if self._m_last_update > 0:
-      self._m_output_stream.write("\033[%dA\033[0J" % (
-          len(self._m_task_names) * 2 + 1))
+      self._m_output_stream.write("\033[0J")
 
     for order_id, task_name in enumerate(self._m_task_names):
       task_str = self._get_formated_task(order_id, task_name)
@@ -67,7 +74,14 @@ class MultiTaskTableProgressUI(MultiTaskProgressUI):
       self._m_output_stream.write(task_str + "\n")
       self._m_output_stream.write("%s\n" % (self._m_row_separator))
 
+    if reuse and len(self._m_task_names) > 0:
+      self._m_output_stream.write(
+          "\033[%dA" % (len(self._m_task_names) * 2 + 1))
     self._m_last_update = time.time()
+
+  def clear(self):
+    if self._m_last_update > 0:
+      self._m_output_stream.write("\033[0J")
 
   def _get_formated_task(self, order_id, task_name):
     task_info = self._m_runner_inventory.get_info(task_name)
@@ -81,7 +95,11 @@ class MultiTaskTableProgressUI(MultiTaskProgressUI):
     task_str += " " + task_name.ljust(self._m_column_length['task_name'])
 
     # column 3. Task Status.
-    task_str += " | " + self.__class__.color[task_info["status"]]
+    if task_name in self._m_unrelated_tasks:
+      codes = "3;4;"
+    else:
+      codes = ""
+    task_str += " | " + self.__class__.color[task_info["status"]] % (codes)
 
     if task_info["start_time"] is not None:
       # column 4. Task Start Time.
@@ -102,9 +120,12 @@ class MultiTaskTableProgressUI(MultiTaskProgressUI):
 
     # column 7. Task Depends.
     if task_info["status"] in [RunnerStatus.WAITING, RunnerStatus.CANCELED]:
-      depends = self._m_runner_dependency.depends(task_name)
+      if task_name not in self._m_unrelated_tasks:
+        depends = self._m_runner_dependency.depends(task_name)
+      else:
+        depends = []
       depend_tasks_str = ",".join(depends)
-      if len(depend_tasks_str) > 48:
+      if len(depend_tasks_str) > 32:
         tasks_ids = map(self._m_task_names.index, depends)
         depend_tasks_str = ",".join(map(str, sorted(tasks_ids)))
       task_str += " | " + depend_tasks_str

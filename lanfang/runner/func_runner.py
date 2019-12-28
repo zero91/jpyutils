@@ -97,6 +97,9 @@ class FuncThreadRunner(FuncRunner, threading.Thread):
   def is_alive(self):
     return threading.Thread.is_alive(self)
 
+  def join(self, timeout=None):
+    return threading.Thread.join(self, timeout=timeout)
+
   def stop(self):
     self._m_runner_status["need_stop"] = True
     threading.Thread.terminate(self)
@@ -149,6 +152,9 @@ class FuncProcessRunner(FuncRunner, multiprocessing.Process):
 
   def is_alive(self):
     return multiprocessing.Process.is_alive(self)
+
+  def join(self, timeout=None):
+    return multiprocessing.Process.join(self, timeout=timeout)
 
   def stop(self):
     self._m_runner_status["need_stop"] = True
