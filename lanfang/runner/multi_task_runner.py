@@ -432,10 +432,10 @@ class MultiTaskRunner(object):
     record = self._get_cached_record(params)
 
     runner_inventory_file = record["runner_inventory"].save(
-            checkpoint_path, max_checkpoint_num=max_checkpoint_num)
+        checkpoint_path, max_checkpoint_num=max_checkpoint_num)
 
     context_file = record["context"].save(
-            checkpoint_path, max_checkpoint_num=max_checkpoint_num)
+        checkpoint_path, max_checkpoint_num=max_checkpoint_num)
 
     all_checkpoints_file = os.path.join(checkpoint_path, "all_checkpoints.json")
     checkpoints_record = {}

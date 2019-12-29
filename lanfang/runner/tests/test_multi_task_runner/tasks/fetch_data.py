@@ -19,8 +19,8 @@ if __name__ == "__main__":
   args = parse_args()
   server_path = urllib.parse.urlparse(args.data_url).path[1:]
   res = {
-    "train": os.path.join("./test", args.locale, "train_" + server_path),
-    "dev": os.path.join("./test", args.locale, "dev_" + server_path),
-    "test": os.path.join("./test", args.locale, "test_" + server_path),
+    "train": "./test/{}/train_{}".format(args.locale, server_path),
+    "dev": "./test/{}/dev_{}".format(args.locale, server_path),
+    "test": "./test/{}/test_{}".format(args.locale, server_path),
   }
   print(json.dumps(res))

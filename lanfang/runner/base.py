@@ -267,7 +267,7 @@ class RunnerContext(abc.ABC):
     pass
 
   @abc.abstractmethod
-  def save(self, checkpoint_path):
+  def save(self, checkpoint_path, max_checkpoint_num=5):
     """Save the context into a path in disk.
     """
     pass

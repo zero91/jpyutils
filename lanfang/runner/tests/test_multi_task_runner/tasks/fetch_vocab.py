@@ -18,5 +18,5 @@ if __name__ == "__main__":
 
   args = parse_args()
   server_path = urllib.parse.urlparse(args.data_url).path[1:]
-  res = {"vocab_file": os.path.join("./test", args.locale, server_path)}
+  res = {"vocab_file": "./test/{}/{}".format(args.locale, server_path)}
   print(json.dumps(res))
