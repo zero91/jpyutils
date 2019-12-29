@@ -117,8 +117,6 @@ class RunnerInventory(object):
     for task_name in self._m_runners:
       status[task_name] = self.get_info(task_name)
       status[task_name]["status"] = status[task_name]["status"].name
-      status[task_name]["exitcode"] = \
-          self._m_runners[task_name]["runner"].exitcode
     self._m_lock.release()
 
     status_file = os.path.join(
@@ -138,10 +136,12 @@ class RunnerInventory(object):
     try:
       with open(checkpoint_path, 'r') as fin:
         for name, task_status in json.load(fin).items():
+          if name not in self._m_runners:
+            raise KeyError("Can't find task '%s'" % (name))
           self._m_runners[name]["status"] = RunnerStatus[task_status["status"]]
           self._m_restored_data[name] = task_status
     except BaseException as e:
-      logging.warning("Restore from checkpoint '%s' got exception '%s'",
+      logging.warning("Restore from checkpoint '%s' got exception: %s.",
           checkpoint_path, e)
     finally:
       self._m_lock.release()
@@ -290,13 +290,16 @@ class RunnerInventory(object):
       start_time = runner.start_time
       elapsed_time = runner.elapsed_time
       attempts = runner.attempts
+      exitcode = runner.exitcode
     else:
       start_time = self._m_restored_data[name]["start_time"]
       elapsed_time = self._m_restored_data[name]["elapsed_time"]
       attempts = self._m_restored_data[name]["attempts"]
+      exitcode = self._m_restored_data[name]["exitcode"]
 
     return {
       "status": status,
+      "exitcode": exitcode,
       "start_time": start_time,
       "elapsed_time": elapsed_time,
       "attempts": attempts
@@ -371,7 +374,7 @@ class MultiTaskRunner(object):
     self._m_lock = threading.Lock()
     self._m_runner_code_snippet = []
     self._m_runner_inventory = RunnerInventory(retry=retry, interval=interval)
-    self._m_cached_running_history = collections.OrderedDict()
+    self._m_cached_running_record = collections.OrderedDict()
     self._m_runner_dependency = DynamicTopologicalGraph()
 
   def __enter__(self):
@@ -390,9 +393,9 @@ class MultiTaskRunner(object):
     """Close all key resources.
     """
     self._m_runner_inventory.close()
-    for key, record in self._m_cached_running_history.items():
+    for key, record in self._m_cached_running_record.items():
       record["runner_inventory"].close(force=force, timeout=timeout)
-    self._m_cached_running_history.clear()
+    self._m_cached_running_record.clear()
 
   def save(self, checkpoint_path, *, params=None, max_checkpoint_num=5):
     """Save the status into disk.
@@ -426,7 +429,7 @@ class MultiTaskRunner(object):
 
     if params is None:
       params = self._m_params
-    record = self._get_cached_history(params)
+    record = self._get_cached_record(params)
 
     runner_inventory_file = record["runner_inventory"].save(
             checkpoint_path, max_checkpoint_num=max_checkpoint_num)
@@ -476,7 +479,7 @@ class MultiTaskRunner(object):
       restore_info = checkpoints_record[checkpoints_record["checkpoint"]]
 
       self.set_params(restore_info["params"])
-      cached_record = self._get_cached_history(restore_info["params"])
+      cached_record = self._get_cached_record(restore_info["params"])
 
       cached_record["context"].restore(restore_info["context"])
       cached_record["runner_inventory"].restore(
@@ -508,7 +511,7 @@ class MultiTaskRunner(object):
 
     self._m_runner_inventory.add(name, target, **kwargs)
     self._m_runner_dependency.add(name, depends)
-    for key, record in self._m_cached_running_history.items():
+    for key, record in self._m_cached_running_record.items():
       record["runner_inventory"].add(name, target, **kwargs)
     return self
 
@@ -587,10 +590,7 @@ class MultiTaskRunner(object):
       if params is None:
         params = self._m_params
 
-      if params is not None:
-        runner_inventory = self._get_cached_history(params)["runner_inventory"]
-      else:
-        runner_inventory = self._m_runner_inventory
+      runner_inventory = self._get_cached_record(params)["runner_inventory"]
 
       progress_ui = self._m_runner_progress_ui_class(
           runner_inventory, self._m_runner_dependency)
@@ -648,9 +648,9 @@ class MultiTaskRunner(object):
                                 try_best=False):
     if params is None:
       params = self._m_params
-    history_info = self._get_cached_history(params)
-    runner_inventory = history_info["runner_inventory"]
-    context = history_info["context"]
+    record = self._get_cached_record(params)
+    runner_inventory = record["runner_inventory"]
+    context = record["context"]
 
     dependency = self._m_runner_dependency.subset(tasks)
     enabled_tasks = set(dependency.get_nodes())
@@ -722,31 +722,33 @@ class MultiTaskRunner(object):
       progress_ui.clear()
     return len(failed_tasks)
 
-  def _get_cached_history(self, params):
+  def _get_cached_record(self, params):
     params_str = json.dumps(params, sort_keys=True).encode("utf-8")
     params_hashkey = hashlib.md5(params_str).hexdigest()
-    if params_hashkey in self._m_cached_running_history:
-      return self._m_cached_running_history[params_hashkey]
+    if params_hashkey in self._m_cached_running_record:
+      return self._m_cached_running_record[params_hashkey]
 
     if self._m_config_file is not None:
       context = DependentRunnerContext(
           task_config_file=self._m_config_file, **self._m_config_kwargs)
     else:
       context = RecordRunnerContext()
-    context.set_params(params)
 
-    if len(self._m_cached_running_history) == 0:
+    if params is not None:
+      context.set_params(params)
+
+    if len(self._m_cached_running_record) == 0:
       log_path = self._m_log_path
     else:
       log_path = os.path.join(self._m_log_path, params_hashkey)
 
-    self._m_cached_running_history[params_hashkey] = {
+    self._m_cached_running_record[params_hashkey] = {
       "params": copy.deepcopy(params),
       "runner_inventory": self._m_runner_inventory.new(
           context=context, log_path=log_path),
       "context": context
     }
-    return self._m_cached_running_history[params_hashkey]
+    return self._m_cached_running_record[params_hashkey]
 
   def _kill_signal_handler(self, signum, stack, run_params=None):
     # Every subproces will receive the same signal,
@@ -762,5 +764,5 @@ class MultiTaskRunner(object):
 
   def stop(self):
     """Stop all runners."""
-    for task_name, record in self._m_cached_running_history.items():
+    for task_name, record in self._m_cached_running_record.items():
       record["runner_inventory"].close(force=True)

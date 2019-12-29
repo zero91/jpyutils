@@ -13,6 +13,7 @@ from lanfang.runner.func_runner import FuncProcessRunner
 from lanfang.runner.multi_task_dependency import TopologicalGraph
 from lanfang.runner.multi_task_dependency import DynamicTopologicalGraph
 from lanfang.runner.multi_task_config import MultiTaskConfig
+from lanfang.runner.multi_task_config import MultiTaskJsonnetConfig
 from lanfang.runner.multi_task_runner import MultiTaskRunner
 from lanfang.runner.task_register import TaskRegister
 from lanfang.runner.task_register import TaskSchema

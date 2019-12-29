@@ -1,14 +1,13 @@
 import lanfang
 import unittest
 import os
-import json
 
 
 class TestMultiTaskJsonnetConfig(unittest.TestCase):
   def setUp(self):
     config_file = os.path.join(
         os.path.dirname(os.path.realpath(__file__)),
-        "conf/multi_task_config.jsonnet")
+        "multi_task_config.jsonnet")
     self._m_config = lanfang.runner.MultiTaskJsonnetConfig(
         config_file = config_file)
 

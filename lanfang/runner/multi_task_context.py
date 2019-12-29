@@ -22,6 +22,8 @@ class RecordRunnerContext(RunnerContext):
     return {}
 
   def set_params(self, params):
+    if params is None:
+      return
     if not isinstance(params, dict):
       raise TypeError("Parameter 'params' must be a dict, "
           "but received %s(%s)" % (type(params), params))
