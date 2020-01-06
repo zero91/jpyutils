@@ -1,4 +1,4 @@
-from lanfang.ai.engine.base.dataset import Dataset
+from lanfang.ai.engine.dataset import Dataset
 from lanfang.ai.engine import names
 from lanfang.utils import disk
 
@@ -12,7 +12,7 @@ import tensorflow as tf
 
 
 class Cifar10(Dataset):
-  """The CIFAR-10 dataset consists of 60000 32x32 colour images in 10 classes,
+  """The CIFAR-10 dataset consists of 60000 32x32 color images in 10 classes,
   with 6000 images per class.  There are 50000 training images and 10000 test
   images.
 
@@ -29,16 +29,25 @@ class Cifar10(Dataset):
   __data_url__ = "https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz"
   __data_md5__ = "c58f30108f718f92721af3b95e74349a"
 
-  def __init__(self, local_dir="~/.lanfang/ai/dataset/cifar10", **params):
+  def __init__(self, local_dir="~/.lanfang/ai/dataset/images/cifar10",
+                     **kwargs):
     """Initialize this class."""
     self._m_local_dir = os.path.expanduser(local_dir)
     self._m_dev_size = 5000
     self._m_seed = 9507
 
+  @staticmethod
   def name():
     return "cifar10"
 
-  def get_params(self):
+  @staticmethod
+  def default_parameters():
+    return {}
+
+  def parameters(self):
+    return {}
+
+  def meta(self):
     return {
       names.Image.HEIGHT: 32,
       names.Image.WIDTH: 32,
@@ -70,10 +79,6 @@ class Cifar10(Dataset):
     tar.close()
     return self._m_local_dir
 
-  def get_padding(self):
-    """Padded shapes and padding values for batch data"""
-    return None
-
   def read(self, split, mode):
     """Create an instance of the dataset object."""
     if split in [names.DataSplit.TRAIN, names.DataSplit.DEV]:
@@ -83,7 +88,7 @@ class Cifar10(Dataset):
     else:
       raise ValueError("Invalid split value '%s'" % (split))
 
-    params = self.get_params()
+    meta = self.meta()
 
     all_images = []
     all_labels = []
@@ -96,9 +101,9 @@ class Cifar10(Dataset):
         images = np.array(d[b"data"], dtype=np.uint8)
         labels = np.array(d[b"labels"], dtype=np.uint8)
 
-        image_height = params[names.Image.HEIGHT]
-        image_width = params[names.Image.WIDTH]
-        channels = params[names.Image.CHANNEL]
+        image_height = meta[names.Image.HEIGHT]
+        image_width = meta[names.Image.WIDTH]
+        channels = meta[names.Image.CHANNEL]
         images = np.reshape(
             images, [images.shape[0], channels, image_height, image_width])
         images = np.transpose(images, [0, 2, 3, 1])
@@ -128,16 +133,19 @@ class Cifar10(Dataset):
     label = tf.cast(label, tf.int32)
 
     if mode == tf.estimator.ModeKeys.TRAIN:
-      params = self.get_params()
-      height = params[names.Image.HEIGHT]
-      width = params[names.Image.WIDTH]
-      channels = params[names.Image.CHANNEL]
+      meta = self.meta()
+      height = meta[names.Image.HEIGHT]
+      width = meta[names.Image.WIDTH]
+      channels = meta[names.Image.CHANNEL]
       image = tf.image.resize_with_crop_or_pad(image, height + 4, width + 4)
       image = tf.image.random_crop(image, [height, width, channels])
       image = tf.image.random_flip_left_right(image)
 
     image = tf.image.per_image_standardization(image)
     return {names.Image.IMAGE: image}, {names.Classification.LABEL: label}
+
+  def paddings(self):
+    return None
 
 
 class Cifar100(Cifar10):
@@ -153,31 +161,22 @@ class Cifar100(Cifar10):
   __data_url__ = "https://www.cs.toronto.edu/~kriz/cifar-100-python.tar.gz"
   __data_md5__ = "eb9058c3a382ffc7106e4002c42a8d85"
 
-  def __init__(self, local_dir="~/.lanfang/ai/dataset/cifar100", **params):
+  def __init__(self, local_dir="~/.lanfang/ai/dataset/images/cifar100",
+                     **kwargs):
     """Initialize this class."""
-    super(self.__class__, self).__init__(local_dir, **params)
-    #self._m_local_dir = os.path.expanduser(local_dir)
-    #self._m_dev_size = 5000
-    #self._m_seed = 9507
+    super(self.__class__, self).__init__(local_dir, **kwargs)
 
+  @staticmethod
   def name():
     return "cifar100"
 
-  def get_params(self):
+  def meta(self):
     return {
       names.Image.HEIGHT: 32,
       names.Image.WIDTH: 32,
       names.Image.CHANNEL: 3,
       names.Classification.NUM_CLASSES: 100
     }
-
-  def artifacts(self):
-    """Return artifacts of this dataset."""
-    return {}
-
-  def get_padding(self):
-    """Padded shapes and padding values for batch data"""
-    return None
 
   def read(self, split, mode):
     """Create an instance of the dataset object."""
@@ -188,7 +187,7 @@ class Cifar100(Cifar10):
     else:
       raise ValueError("Invalid split value '%s'" % (split))
 
-    params = self.get_params()
+    meta = self.meta()
 
     all_images = []
     all_labels = []
@@ -201,9 +200,9 @@ class Cifar100(Cifar10):
         images = np.array(d[b"data"], dtype=np.uint8)
         labels = np.array(d[b"fine_labels"], dtype=np.uint8)
 
-        image_height = params[names.Image.HEIGHT]
-        image_width = params[names.Image.WIDTH]
-        channels = params[names.Image.CHANNEL]
+        image_height = meta[names.Image.HEIGHT]
+        image_width = meta[names.Image.WIDTH]
+        channels = meta[names.Image.CHANNEL]
         images = np.reshape(
             images, [images.shape[0], channels, image_height, image_width])
         images = np.transpose(images, [0, 2, 3, 1])

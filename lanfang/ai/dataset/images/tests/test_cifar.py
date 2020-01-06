@@ -1,4 +1,4 @@
-from lanfang.ai.dataset import cifar
+from lanfang.ai.dataset.images import cifar
 from lanfang.ai.engine import names
 
 import unittest
@@ -15,11 +15,12 @@ class TestCifar10(unittest.TestCase):
   def tearDown(self):
     pass
 
-  def test_get_params(self):
-    self.assertEqual(len(self._m_cifar10.get_params()), 4);
+  def test_parameters(self):
+    self.assertEqual(len(self._m_cifar10.parameters()), 0)
+    self.assertEqual(len(self._m_cifar10.meta()), 4)
 
   def test_artifacts(self):
-    self.assertEqual(self._m_cifar10.artifacts(), {})
+    self.assertDictEqual(self._m_cifar10.artifacts(), {})
 
   def test_preparse(self):
     save_dir = self._m_cifar10.prepare()
@@ -30,8 +31,8 @@ class TestCifar10(unittest.TestCase):
     self.assertTrue(os.path.isdir(
         os.path.join(save_dir, "cifar-10-batches-py")))
 
-  def test_get_padding(self):
-    self.assertIsNone(self._m_cifar10.get_padding())
+  def test_paddings(self):
+    self.assertIsNone(self._m_cifar10.paddings())
 
   def test_read_parse(self):
     train_data = self._m_cifar10.read(
@@ -60,11 +61,13 @@ class TestCifar100(unittest.TestCase):
   def tearDown(self):
     pass
 
-  def test_get_params(self):
-    self.assertEqual(len(self._m_cifar100.get_params()), 4);
+  def test_parameters(self):
+    self.assertEqual(len(self._m_cifar100.parameters()), 0)
+    self.assertEqual(len(self._m_cifar100.meta()), 4)
+    self.assertEqual(len(self._m_cifar100.default_parameters()), 0)
 
   def test_artifacts(self):
-    self.assertEqual(self._m_cifar100.artifacts(), {})
+    self.assertDictEqual(self._m_cifar100.artifacts(), {})
 
   def test_preparse(self):
     save_dir = self._m_cifar100.prepare()
@@ -75,8 +78,8 @@ class TestCifar100(unittest.TestCase):
     self.assertTrue(os.path.isdir(
         os.path.join(save_dir, "cifar-100-python")))
 
-  def test_get_padding(self):
-    self.assertIsNone(self._m_cifar100.get_padding())
+  def test_paddings(self):
+    self.assertIsNone(self._m_cifar100.paddings())
 
   def test_read_parse(self):
     train_data = self._m_cifar100.read(

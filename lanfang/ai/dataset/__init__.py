@@ -1,3 +1,2 @@
-from . import mnist
-from . import cifar
-from . import imdb
+from . import images
+from . import texts

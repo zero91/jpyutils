@@ -1,9 +1,11 @@
-from lanfang.ai.dataset import imdb
-from lanfang.ai.engine import names
+from lanfang.ai.dataset.texts import imdb
+from lanfang.ai import names
 
 import unittest
 import os
 import tensorflow as tf
+import logging
+logging.basicConfig(level=logging.INFO)
 
 
 class TestIMDB(unittest.TestCase):
@@ -13,8 +15,8 @@ class TestIMDB(unittest.TestCase):
   def tearDown(self):
     pass
 
-  def test_get_params(self):
-    self.assertEqual(len(self._m_imdb.get_params()), 5);
+  def test_parameters(self):
+    self.assertEqual(len(self._m_imdb.parameters()), 6)
 
   def test_artifacts(self):
     artifacts = self._m_imdb.artifacts()
@@ -23,13 +25,13 @@ class TestIMDB(unittest.TestCase):
 
   def test_preparse(self):
     save_dir = self._m_imdb.prepare()
-    self.assertTrue(os.path.isdir(os.path.join(save_dir, "train")))
-    self.assertTrue(os.path.isdir(os.path.join(save_dir, "dev")))
-    self.assertTrue(os.path.isdir(os.path.join(save_dir, "test")))
+    self.assertTrue(os.path.isfile(os.path.join(save_dir, "train.txt")))
+    self.assertTrue(os.path.isfile(os.path.join(save_dir, "dev.txt")))
+    self.assertTrue(os.path.isfile(os.path.join(save_dir, "test.txt")))
     self.assertTrue(os.path.isfile(os.path.join(save_dir, "vocab.txt")))
 
-  def test_get_padding(self):
-    self.assertIsNotNone(self._m_imdb.get_padding())
+  def test_paddings(self):
+    self.assertIsNotNone(self._m_imdb.paddings())
 
   def test_read_parse(self):
     train_data = self._m_imdb.read(
@@ -50,3 +52,14 @@ class TestIMDB(unittest.TestCase):
       self.assertEqual(parse_label.shape, ())
       self.assertEqual(parse_sent.dtype, tf.int32)
       self.assertEqual(parse_label.dtype, tf.int32)
+
+  def test_data_fn(self):
+    train_fn = self._m_imdb.data_fn(names.DataSplit.TRAIN, batch_size=32)
+    train_data = train_fn(tf.estimator.ModeKeys.EVAL, config=None)
+
+    if tf.executing_eagerly():
+      for features, labels in train_data.take(10):
+        self.assertListEqual(
+            features[names.Text.SENTENCE].shape.as_list(), [32, 256])
+        self.assertListEqual(
+            labels[names.Classification.LABEL].shape.as_list(), [32])

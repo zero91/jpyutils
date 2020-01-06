@@ -1,5 +1,5 @@
-from lanfang.ai.dataset import mnist
-from lanfang.ai.engine import names
+from lanfang.ai.dataset.images import mnist
+from lanfang.ai import names
 
 import unittest
 import os
@@ -13,11 +13,13 @@ class TestMnist(unittest.TestCase):
   def tearDown(self):
     pass
 
-  def test_get_params(self):
-    self.assertEqual(len(self._m_mnist.get_params()), 4);
+  def test_parameters(self):
+    self.assertEqual(len(self._m_mnist.meta()), 4);
+    self.assertEqual(len(self._m_mnist.parameters()), 0)
+    self.assertEqual(len(mnist.Mnist.default_parameters()), 0)
 
   def test_artifacts(self):
-    self.assertEqual(self._m_mnist.artifacts(), {})
+    self.assertDictEqual(self._m_mnist.artifacts(), {})
 
   def test_preparse(self):
     save_dir = self._m_mnist.prepare()
@@ -29,9 +31,6 @@ class TestMnist(unittest.TestCase):
     ]
     for fname in mnist_files:
       self.assertTrue(os.path.isfile(os.path.join(save_dir, fname)))
-
-  def test_get_padding(self):
-    self.assertIsNone(self._m_mnist.get_padding())
 
   def test_read_parse(self):
     train_data = self._m_mnist.read(
@@ -53,3 +52,14 @@ class TestMnist(unittest.TestCase):
       self.assertEqual(parse_image.dtype, tf.float32)
       self.assertEqual(parse_label.dtype, tf.int32)
 
+  def test_paddings(self):
+    self.assertIsNone(self._m_mnist.paddings())
+
+  def test_data_fn(self):
+    train_fn = self._m_mnist.data_fn(names.DataSplit.TRAIN, batch_size=32)
+
+    train_data = train_fn(tf.estimator.ModeKeys.TRAIN, config=None)
+    if tf.executing_eagerly():
+      for features, labels in train_data.take(10):
+        self.assertListEqual(features["image"].shape.as_list(), [32, 28, 28, 1])
+        self.assertListEqual(labels["label"].shape.as_list(), [32])

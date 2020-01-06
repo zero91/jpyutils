@@ -1,4 +1,4 @@
-from lanfang.ai.engine.base.dataset import Dataset
+from lanfang.ai.engine.dataset import Dataset
 from lanfang.ai.engine import names
 from lanfang.utils import disk
 
@@ -12,7 +12,7 @@ import tensorflow as tf
 
 
 class Mnist(Dataset):
-  def __init__(self, local_dir="~/.lanfang/ai/dataset/mnist", **params):
+  def __init__(self, local_dir="~/.lanfang/ai/dataset/images/mnist", **kwargs):
     super(self.__class__, self).__init__()
 
     self._m_remote_url = "http://yann.lecun.com/exdb/mnist/"
@@ -31,10 +31,18 @@ class Mnist(Dataset):
       "train-labels-idx1-ubyte.gz": "d53e105ee54ea40749a09fcbcd1e9432",
     }
 
+  @staticmethod
   def name():
     return "mnist"
 
-  def get_params(self):
+  @staticmethod
+  def default_parameters():
+    return {}
+
+  def parameters(self):
+    return {}
+
+  def meta(self):
     return {
       names.Image.HEIGHT: 28,
       names.Image.WIDTH: 28,
@@ -43,7 +51,6 @@ class Mnist(Dataset):
     }
 
   def artifacts(self):
-    """Return artifacts of this dataset."""
     return {}
 
   def prepare(self):
@@ -60,10 +67,6 @@ class Mnist(Dataset):
       logging.info("Download file from %s.", remote_fname)
       urllib.request.urlretrieve(remote_fname, local_fname)
     return self._m_local_dir
-
-  def get_padding(self):
-    """Padded shapes and padding values for batch data"""
-    return None
 
   def read(self, split, mode):
     """Create an instance of the dataset object."""
@@ -104,3 +107,6 @@ class Mnist(Dataset):
     image = tf.cast(image, tf.float32)
     label = tf.cast(label, tf.int32)
     return {names.Image.IMAGE: image}, {names.Classification.LABEL: label}
+
+  def paddings(self):
+    return None

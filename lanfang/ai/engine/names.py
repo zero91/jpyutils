@@ -26,6 +26,7 @@ class Text(str, enum.Enum):
   SENTENCE = "sent"
   SENTENCE_A = "sent_a"
   SENTENCE_B = "sent_b"
+  TOKENIZER = "tokenizer"
 
 
 class Classification(str, enum.Enum):
@@ -34,16 +35,23 @@ class Classification(str, enum.Enum):
 
 
 class CNN(str, enum.Enum):
-  FILTERS = "filters"
-  KERNEL_SIZE = "kernel_size"
-  KERNEL_STRIDES = "kernel_strides"
-  POOL_SIZE = "pool_size"
-  POOL_STRIDES = "pool_strides"
+  FILTERS = "cnn_filters"
+  KERNEL_SIZE = "cnn_kernel_size"
+  KERNEL_STRIDES = "cnn_kernel_strides"
+  POOL_SIZE = "cnn_pool_size"
+  POOL_STRIDES = "cnn_pool_strides"
 
 
 class Dense(str, enum.Enum):
-  UNITS = "units"
+  UNITS = "dense_units"
+
+
+class Embedding(str, enum.Enum):
+  WORD_EMBEDDING_DIM = "word_embedding_dim"
+  CHAR_EMBEDDING_DIM = "char_embedding_dim"
 
 
 class Regularization(str, enum.Enum):
   DROP_RATE = "drop_rate"
+  L1_WEIGHT = "l1_loss_weight"
+  L2_WEIGHT = "l2_loss_weight"
