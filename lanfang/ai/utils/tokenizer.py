@@ -36,7 +36,8 @@ class Tokenizer(abc.ABC):
                           save_file=None,
                           lowercase=False,
                           extra_tokens=None,
-                          min_freq=1):
+                          min_freq=1,
+                          **tokenize_kwargs):
     """Build a dictionary.
     """
     #TODO: token normalization
@@ -58,9 +59,9 @@ class Tokenizer(abc.ABC):
       text = [text]
 
     if lowercase is True:
-      tokens = [self.tokenize(t.lower()) for t in text]
+      tokens = [self.tokenize(t.lower(), **tokenize_kwargs) for t in text]
     else:
-      tokens = [self.tokenize(t) for t in text]
+      tokens = [self.tokenize(t, **tokenize_kwargs) for t in text]
 
     token_freq = collections.Counter(itertools.chain(*tokens))
     if save_file is not None:
@@ -74,14 +75,26 @@ class Tokenizer(abc.ABC):
     return token_freq
 
 
+class IdentityTokenizer(Tokenizer):
+  """Treat each element as a single token."""
+
+  @staticmethod
+  def name():
+    return "identity_tokenizer"
+
+  def tokenize(self, s, sep=None):
+    return s
+
+
 class SimpleTokenizer(Tokenizer):
+  """Using str.split to get each token."""
 
   @staticmethod
   def name():
     return "simple_tokenizer"
 
   def tokenize(self, s, sep=None):
-    return s.split(sep=sep)
+    return s.strip().split(sep=sep)
 
 
 # Register all tokenziers
