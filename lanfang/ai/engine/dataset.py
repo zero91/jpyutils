@@ -25,6 +25,13 @@ class Dataset(abc.ABC):
     raise NotImplementedError(
         "Abstract static method 'name' must be implemented.")
 
+  #TODO
+  #@staticmethod
+  #@abc.abstractmethod
+  #def version():
+  #  raise NotImplementedError(
+  #      "Abstract static method 'version' must be implemented.")
+
   @staticmethod
   @abc.abstractmethod
   def default_parameters():
@@ -38,6 +45,8 @@ class Dataset(abc.ABC):
 
   @abc.abstractmethod
   def meta(self):
+    """Return meta info of this dataset.
+    """
     pass
 
   @abc.abstractmethod

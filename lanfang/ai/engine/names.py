@@ -19,6 +19,7 @@ class Dictionary(str, enum.Enum):
   VOCAB_SIZE = "vocab_size"
   LOWERCASE = "lowercase"
   OOV_SIZE = "oov_size"
+  LABEL_FILE = "label_file"
 
 
 class Text(str, enum.Enum):
