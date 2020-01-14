@@ -12,10 +12,10 @@ from lanfang.utils import func as _func
 
 
 for dataset_class in _func.subclasses(Dataset):
-  Dataset.register(dataset_class.name(), dataset_class)
+  Dataset.register(dataset_class)
 
 for model_class in _func.subclasses(KerasModel):
-  Model.register(model_class.name(), model_class)
+  Model.register(model_class)
 
 
 __all__ = [_s for _s in dir() if not _s.startswith('_')]

@@ -41,9 +41,19 @@ class IMDB(Dataset):
     self._m_seed = 9507
     self._m_dev_size = 5000
 
+  @staticmethod
   def name():
     return "imdb"
 
+  @staticmethod
+  def version():
+    return "v1.0"
+
+  @staticmethod
+  def sota():
+    return
+
+  @staticmethod
   def default_parameters():
     return {
       names.Dictionary.VOCAB_FILE: None,

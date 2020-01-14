@@ -36,6 +36,14 @@ class Mnist(Dataset):
     return "mnist"
 
   @staticmethod
+  def version():
+    return "v1998"
+
+  @staticmethod
+  def sota():
+    return
+
+  @staticmethod
   def default_parameters():
     return {}
 

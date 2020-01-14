@@ -10,6 +10,7 @@ import os
 import json
 import logging
 import shutil
+import collections
 
 import tensorflow as tf
 
@@ -30,6 +31,17 @@ class OracleConfig(object):
         optimizer_params=optimizer_params,
         model_selector_params=model_selector_params,
         tensorboard_params=tensorboard_params)
+
+  def copy(self):
+    config = collections.OrderedDict()
+    config["tag"] = self._m_tag
+    config["output_dir"] = self._m_output_dir
+    config["dataset"] = self._m_dataset_params
+    config["model"] = self._m_model_params
+    config["optimizer"] = self._m_optimizer_params
+    config["model_selector"] = self._m_model_selector_params
+    config["tensorboard"] = self._m_tensorboard_params
+    return config
 
   @property
   def tag(self):
@@ -58,6 +70,14 @@ class OracleConfig(object):
   @property
   def tensorboard(self):
     return copy.deepcopy(self._m_tensorboard_params)
+
+  def save(self, save_fname):
+    save_dir = os.path.dirname(os.path.realpath(save_fname))
+    if not os.path.exists(save_dir):
+      os.makedirs(save_dir)
+
+    with open(save_fname, 'w') as fout:
+      json.dump(self.copy(), fout, indent=2)
 
   def _setup_params(self, *, dataset_params,
                              model_params,
@@ -169,7 +189,7 @@ class KerasOracle(BaseOracle):
 
     Parameters
     ----------
-    overwrite_params: bool
+    overwrite: bool
       Whether to overwrite existing params or not.
 
     Returns
@@ -188,15 +208,15 @@ class KerasOracle(BaseOracle):
     if self._m_keras_model is None:
       raise RuntimeError("KerasOracle must be initialized first.")
 
-    #params_fname = os.path.join(self._m_model_dir, "params.json")
-    #if os.path.exists(params_fname) and not overwrite_params:
-    #  with open(params_fname, "r") as fp:
-    #    if json.load(fp) != self._m_hparams:
-    #      raise RuntimeError("Mismatching parameters found.")
-    #else:
-    #  with open(params_fname, "w") as fp:
-    #    out = json.dumps(self._m_hparams, indent=2, sort_keys=True)
-    #    fp.write(out)
+    config_fname = os.path.join(self._m_model_dir, "oracle_config.json")
+    if not overwrite and os.path.exists(config_fname):
+      with open(config_fname, "r") as fin:
+        if json.load(fin) != self._m_config.copy():
+          raise RuntimeError("Mismatching parameters found.")
+
+    if os.path.exists(self._m_model_dir):
+      shutil.rmtree(self._m_model_dir)
+    self._m_config.save(config_fname)
 
     callbacks = []
 
@@ -226,9 +246,6 @@ class KerasOracle(BaseOracle):
         self._m_config.tensorboard)
     if "log_dir" not in tb_kwargs:
       tb_kwargs["log_dir"] = "{}/tensorboard".format(self._m_model_dir)
-    if os.path.exists(tb_kwargs["log_dir"]):
-      shutil.rmtree(tb_kwargs["log_dir"])
-
     callbacks.append(tf.keras.callbacks.TensorBoard(**tb_kwargs))
 
     # train data

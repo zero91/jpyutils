@@ -41,6 +41,14 @@ class Cifar10(Dataset):
     return "cifar10"
 
   @staticmethod
+  def version():
+    return "v2009"
+
+  @staticmethod
+  def sota():
+    return
+
+  @staticmethod
   def default_parameters():
     return {}
 

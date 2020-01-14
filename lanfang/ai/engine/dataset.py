@@ -10,14 +10,36 @@ class Dataset(abc.ABC):
   __datasets__ = {}
 
   @staticmethod
-  def register(name, dataset_class):
+  def register(dataset_class):
     """Register a dataset."""
-    Dataset.__datasets__[name] = dataset_class
+    name = dataset_class.name().lower()
+    if name not in Dataset.__datasets__:
+      Dataset.__datasets__[name] = {}
+
+    version = dataset_class.version().lower()
+    if version in Dataset.__datasets__[name]:
+      raise KeyError("Version %s of dataset %s is already been registered" % (
+          dataset_class.version(), dataset_class.name()))
+
+    Dataset.__datasets__[name][version] = dataset_class
 
   @staticmethod
   def create(name, **kwargs):
     """Create dataset."""
-    return Dataset.__datasets__[name](**kwargs)
+    name = name.lower()
+    if name not in Dataset.__datasets__:
+      raise KeyError("Can't find dataset: %s" % (name))
+
+    if "version" in kwargs:
+      version = kwargs.pop("version")
+    elif len(Dataset.__datasets__[name]) == 1:
+      version = list(Dataset.__datasets__[name].keys())[0]
+    else:
+      versions = Dataset.__datasets__[name].keys()
+      raise KeyError("Dataset %s have multiple versions: %s, "
+          "please specify one." % (name, ",".join(versions)))
+
+    return Dataset.__datasets__[name][version](**kwargs)
 
   @staticmethod
   @abc.abstractmethod
@@ -25,12 +47,19 @@ class Dataset(abc.ABC):
     raise NotImplementedError(
         "Abstract static method 'name' must be implemented.")
 
-  #TODO
-  #@staticmethod
-  #@abc.abstractmethod
-  #def version():
-  #  raise NotImplementedError(
-  #      "Abstract static method 'version' must be implemented.")
+  @staticmethod
+  @abc.abstractmethod
+  def version():
+    """Return version of this dataset."""
+    raise NotImplementedError(
+        "Abstract static method 'version' must be implemented.")
+
+  @staticmethod
+  @abc.abstractmethod
+  def sota():
+    """Return SOTA research result of using dataset."""
+    raise NotImplementedError(
+        "Abstract static method 'sota' must be implemented.")
 
   @staticmethod
   @abc.abstractmethod

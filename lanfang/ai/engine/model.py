@@ -9,8 +9,9 @@ class Model(abc.ABC):
   __models__ = {}
 
   @staticmethod
-  def register(name, model_class):
+  def register(model_class):
     """Register a model."""
+    name = model_class.name().lower()
     if name in Model.__models__:
       raise KeyError("Model '%s' is already exists." % (name))
     Model.__models__[name] = model_class
@@ -18,7 +19,7 @@ class Model(abc.ABC):
   @staticmethod
   def create(name, **kwargs):
     """Create model."""
-    return Model.__models__[name](**kwargs)
+    return Model.__models__[name.lower()](**kwargs)
 
   @staticmethod
   @abc.abstractmethod

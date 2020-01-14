@@ -36,9 +36,19 @@ class SNLI(Dataset):
     self._m_data_path = "{}/lowercase={}".format(
         self._m_local_dir, self._m_lowercase)
 
+  @staticmethod
   def name():
     return "snli"
 
+  @staticmethod
+  def version():
+    return "v1.0"
+
+  @staticmethod
+  def sota():
+    return
+
+  @staticmethod
   def default_parameters():
     return {
       names.Dictionary.VOCAB_FILE: None,
