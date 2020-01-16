@@ -1,5 +1,8 @@
-import unittest
 from lanfang.ai.utils import tags
+
+import itertools
+import unittest
+import jieba
 
 
 class TestTags(unittest.TestCase):
@@ -244,3 +247,11 @@ class TestTags(unittest.TestCase):
     self.assertTupleEqual(entities[1], ('MISC', 4, 4))
     self.assertTupleEqual(entities[2], ('PER', 6, 6))
     self.assertTupleEqual(entities[3], ('PER', 7, 8))
+
+  def test_tag_words(self):
+    sentence = "中华人民共和国今天成立了"
+    word_tags, all_tags = tags.tag_words(jieba.cut(sentence))
+
+    self.assertEqual(len(all_tags), 4)
+    self.assertSetEqual(all_tags, {"B-Word", "I-Word", "E-Word", "S-Word"})
+    self.assertEqual(len(sentence), len(list(itertools.chain(*word_tags))))

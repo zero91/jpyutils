@@ -259,3 +259,32 @@ def get_entities(tags):
     if is_end_chunk(tag, tags[i + 1] if i + 1 != len(tags) else 'O'):
       entities.append((tag.split('-')[1], begin, i))
   return entities
+
+
+def tag_words(words):
+  """Get a word segmentation tags for a sentence using BIES tag method.
+
+  Parameters
+  ----------
+  words: list
+    An list of words to tag.
+
+  Returns
+  -------
+  tags: list
+    An tags list which indicate the position of the char in the word.
+
+  all_tags: set
+    All word tag set.
+  """
+
+  word_tags = []
+  for word in words:
+    if len(word) == 1:
+      word_tags.append(("S-Word",))
+    else:
+      wtags = ['M-Word'] * len(word)
+      wtags[0] = 'B-Word'
+      wtags[-1] = 'E-Word'
+      word_tags.append(tuple(wtags))
+  return word_tags, {"B-Word", "I-Word", "E-Word", "S-Word"}
