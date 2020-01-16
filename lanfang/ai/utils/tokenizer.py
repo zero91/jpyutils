@@ -4,6 +4,8 @@ import collections
 import itertools
 import operator
 
+import jieba
+
 
 class Tokenizer(abc.ABC):
   __tokenizers__ = {}
@@ -95,6 +97,17 @@ class SimpleTokenizer(Tokenizer):
 
   def tokenize(self, s, sep=None):
     return s.strip().split(sep=sep)
+
+
+class JiebaTokenizer(Tokenizer):
+  """Use jieba to tokenize word."""
+
+  @staticmethod
+  def name():
+    return "jieba"
+
+  def tokenize(self, s, cut_all=False, HMM=True):
+    return list(jieba.cut(s, cut_all=cut_all, HMM=HMM))
 
 
 # Register all tokenziers
