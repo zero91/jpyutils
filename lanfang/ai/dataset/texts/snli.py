@@ -53,7 +53,7 @@ class SNLI(Dataset):
     return {
       names.Dictionary.VOCAB_FILE: None,
       names.Dictionary.VOCAB_SIZE: 10000,
-      names.Dictionary.LOWERCASE: True,
+      names.Text.LOWERCASE: True,
       names.Dictionary.OOV_SIZE: 1,
       names.Text.MAXLEN: 256
     }
@@ -62,7 +62,7 @@ class SNLI(Dataset):
     return {
       names.Dictionary.VOCAB_FILE: self._m_vocab_file,
       names.Dictionary.VOCAB_SIZE: self._m_vocab_size,
-      names.Dictionary.LOWERCASE: self._m_lowercase,
+      names.Text.LOWERCASE: self._m_lowercase,
       names.Dictionary.OOV_SIZE: self._m_oov_size,
       names.Text.MAXLEN: self._m_maxlen
     }
@@ -114,7 +114,7 @@ class SNLI(Dataset):
     )
     return padded_shapes, padding_values
 
-  def read(self, split):
+  def read(self, split, mode):
     if split not in ["train", "dev", "test"]:
       raise ValueError("Invalid split value '%s'" % (split))
 

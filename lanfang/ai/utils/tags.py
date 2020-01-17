@@ -283,7 +283,7 @@ def tag_words(words):
     if len(word) == 1:
       word_tags.append(("S-Word",))
     else:
-      wtags = ['M-Word'] * len(word)
+      wtags = ['I-Word'] * len(word)
       wtags[0] = 'B-Word'
       wtags[-1] = 'E-Word'
       word_tags.append(tuple(wtags))

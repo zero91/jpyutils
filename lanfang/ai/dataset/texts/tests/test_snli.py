@@ -1,11 +1,11 @@
-from lanfang.ai.dataset.texts import snli
-from lanfang.ai import names
-
 import unittest
 import os
-import tensorflow as tf
 import logging
 logging.basicConfig(level=logging.INFO)
+
+from lanfang.ai.dataset.texts import snli
+from lanfang.ai import names
+import tensorflow as tf
 
 
 class TestSNLI(unittest.TestCase):

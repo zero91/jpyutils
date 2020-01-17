@@ -66,6 +66,13 @@ class Tokenizer(abc.ABC):
       tokens = [self.tokenize(t, **tokenize_kwargs) for t in text]
 
     token_freq = collections.Counter(itertools.chain(*tokens))
+    if extra_tokens is not None:
+      max_freq = max(token_freq.values())
+      for extra_token in extra_tokens[::-1]:
+        if extra_token not in token_freq:
+          token_freq[extra_token] = max_freq + 1
+          max_freq += 1
+
     if save_file is not None:
       with open(save_file, 'w') as fout:
         for token, freq in sorted(token_freq.items(),

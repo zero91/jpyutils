@@ -58,7 +58,7 @@ class IMDB(Dataset):
     return {
       names.Dictionary.VOCAB_FILE: None,
       names.Dictionary.VOCAB_SIZE: 10000,
-      names.Dictionary.LOWERCASE: True,
+      names.Text.LOWERCASE: True,
       names.Dictionary.OOV_SIZE: 1,
       names.Text.MAXLEN: 256,
       names.Text.TOKENIZER: "simple_tokenizer",
@@ -68,7 +68,7 @@ class IMDB(Dataset):
     return {
       names.Dictionary.VOCAB_FILE: self._m_vocab_file,
       names.Dictionary.VOCAB_SIZE: self._m_vocab_size,
-      names.Dictionary.LOWERCASE: self._m_lowercase,
+      names.Text.LOWERCASE: self._m_lowercase,
       names.Dictionary.OOV_SIZE: self._m_oov_size,
       names.Text.MAXLEN: self._m_maxlen,
       names.Text.TOKENIZER: self._m_tokenizer.name()
