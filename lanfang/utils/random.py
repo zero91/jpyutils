@@ -17,8 +17,8 @@ def random_str(size, chars=string.ascii_letters, sep=''):
   -------
   random_string: str
     The randomly generated string of length `size`.
-
   """
+
   if not isinstance(chars, (str, tuple, list)):
     raise TypeError("Parameter `chars` is not a seq object")
   return sep.join([random.choice(chars) for _ in range(size)])

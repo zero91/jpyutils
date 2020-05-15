@@ -1,4 +1,5 @@
-import lanfang
+from lanfang.utils import terminal
+
 import unittest
 
 
@@ -10,11 +11,14 @@ class TestMonitor(unittest.TestCase):
     pass
 
   def test_tint(self):
-    print(lanfang.utils.terminal.tint(
-      "BG_Yellow", bg_color="yellow"))
+    self.assertEqual(
+        terminal.tint("BG_Yellow", bg_color="yellow"),
+        '\033[31;43mBG_Yellow\033[0m')
 
-    print(lanfang.utils.terminal.tint(
-      "Highlight", bg_color=None, highlight=True))
+    self.assertEqual(
+        terminal.tint("Highlight", bg_color=None, highlight=True),
+        '\033[1;31mHighlight\033[0m')
 
-    print(lanfang.utils.terminal.tint(
-      "RED", bg_color=None, highlight=False))
+    self.assertEqual(
+        terminal.tint("RED", bg_color=None, highlight=False),
+        '\033[31mRED\033[0m')

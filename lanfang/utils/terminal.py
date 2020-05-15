@@ -26,8 +26,8 @@ def tint(s, font_color="red", bg_color=None, highlight=False):
   -------
   tint_str : str
     Tinted string.
-
   """
+
   code_list = []
   if highlight:
     code_list.append("1")
@@ -70,7 +70,7 @@ def _tint_code(color, place):
   code_dict = {
     "font": {
       "black"  : 30, 
-      "red"  : 31,
+      "red"    : 31,
       "green"  : 32,
       "yellow" : 33,
       "blue"   : 34,
@@ -80,7 +80,7 @@ def _tint_code(color, place):
     },
     "bg": {
       "black"  : 40,
-      "red"  : 41,
+      "red"    : 41,
       "green"  : 42,
       "yellow" : 43,
       "blue"   : 44,

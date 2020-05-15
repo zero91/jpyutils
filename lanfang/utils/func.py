@@ -26,8 +26,8 @@ def extract_kwargs(func, params, *, raises=False, return_missing=False):
   Raises
   ------
   TypeError: If some required parameters are missing and raises is set True.
-
   """
+
   signature = inspect.signature(func)
   kwargs = {}
   missing_values = []
